@@ -1,10 +1,25 @@
+import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'services/settings_service.dart';
 import 'screens/library_screen.dart';
+import 'services/audio_handler.dart'; // We'll create this
+
+late AudioHandler audioHandler;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService.load();
+  final session = await AudioSession.instance;
+  await session.configure(const AudioSessionConfiguration.speech());
+  audioHandler = await AudioService.init(
+    builder: () => TtsAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.example.t2s_reader.audio',
+      androidNotificationChannelName: 'T2S Reader Playback',
+      androidNotificationOngoing: true,
+    ),
+  );
   runApp(const T2SApp());
 }
 
