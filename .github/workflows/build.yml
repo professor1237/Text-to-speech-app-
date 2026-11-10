@@ -32,4 +32,3 @@ jobs:
           prerelease: true # Marks it as a pre-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
