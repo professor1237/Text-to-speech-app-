@@ -7,14 +7,17 @@ import '../models/block.dart';
 import '../models/sentence.dart';
 import '../models/term_rule.dart';
 import '../services/epub_service.dart';
+import '../services/settings_service.dart';
 import '../services/speech_controller.dart';
 import '../widgets/paragraph_view.dart';
+import 'settings_sheet.dart';
 import 'terms_screen.dart';
 
 class ReaderScreen extends StatefulWidget {
   final String filePath;
   final String title;
-  const ReaderScreen({super.key, required this.filePath, required this.title});
+  const ReaderScreen(
+      {super.key, required this.filePath, required this.title});
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -34,7 +37,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void initState() {
     super.initState();
     _speech.addListener(_onSpeechChanged);
+    SettingsService.fontScale.addListener(_onSettingsChanged);
     _load();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -52,6 +60,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void dispose() {
     _speech.removeListener(_onSpeechChanged);
+    SettingsService.fontScale.removeListener(_onSettingsChanged);
     _speech.dispose();
     _scroll.dispose();
     super.dispose();
@@ -103,13 +112,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _speech.speak(q, target, _rules);
   }
 
-  void _togglePlay() {
-    if (_speech.isSpeaking) {
-      _speech.stop();
-    } else {
-      final blocks = _book!.chapters[_chapter].blocks;
-      _speech.speak(_queueFor(blocks), 0, _rules);
-    }
+  void _play() {
+    if (_book == null) return;
+    final blocks = _book!.chapters[_chapter].blocks;
+    _speech.speak(_queueFor(blocks), 0, _rules);
   }
 
   Future<void> _openTerms() async {
@@ -122,10 +128,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   TextStyle _styleFor(BlockType t) {
-    const base = TextStyle(fontSize: 18, height: 1.55);
+    final scale = SettingsService.fontScale.value;
+    final base = TextStyle(fontSize: 18 * scale, height: 1.55);
     switch (t) {
       case BlockType.heading:
-        return base.copyWith(fontSize: 22, fontWeight: FontWeight.bold);
+        return base.copyWith(
+            fontSize: 22 * scale, fontWeight: FontWeight.bold);
       case BlockType.quote:
         return base.copyWith(fontStyle: FontStyle.italic);
       case BlockType.listItem:
@@ -136,6 +144,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final speaking = _speech.isSpeaking;
     return Scaffold(
       appBar: AppBar(
         title: Text(_book == null
@@ -145,10 +154,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 : _book!.chapters[_chapter].title),
         actions: [
           IconButton(
-            icon: Icon(_speech.isSpeaking ? Icons.stop : Icons.play_arrow),
-            onPressed: _book == null ? null : _togglePlay,
+            icon: const Icon(Icons.tune),
+            tooltip: 'Term replacement',
+            onPressed: _openTerms,
           ),
-          IconButton(icon: const Icon(Icons.tune), onPressed: _openTerms),
         ],
       ),
       drawer: _book == null
@@ -179,6 +188,56 @@ class _ReaderScreenState extends State<ReaderScreen> {
           : _book == null
               ? const Center(child: CircularProgressIndicator())
               : _buildReader(),
+      bottomNavigationBar: _book == null
+          ? null
+          : SafeArea(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.play_circle),
+                      iconSize: 36,
+                      tooltip: 'Play',
+                      onPressed: speaking ? null : _play,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.stop_circle),
+                      iconSize: 36,
+                      tooltip: 'Stop',
+                      onPressed: speaking ? () => _speech.stop() : null,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.text_decrease),
+                      iconSize: 28,
+                      tooltip: 'Smaller text',
+                      onPressed: () => SettingsService.setFontScale(
+                          SettingsService.fontScale.value - 0.1),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.text_increase),
+                      iconSize: 28,
+                      tooltip: 'Larger text',
+                      onPressed: () => SettingsService.setFontScale(
+                          SettingsService.fontScale.value + 0.1),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.palette),
+                      iconSize: 28,
+                      tooltip: 'Appearance',
+                      onPressed: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => const SettingsSheet(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
@@ -187,7 +246,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final cur = _speech.current;
     return ListView.builder(
       controller: _scroll,
-      padding: const EdgeInsets.only(top: 8, bottom: 160),
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
       itemCount: chapter.blocks.length,
       itemBuilder: (_, i) {
         final block = chapter.blocks[i];
