@@ -19,7 +19,8 @@ dependencies:
   shared_preferences: ^2.3.0
   audio_service: ^0.18.18
   audio_session: ^0.1.21
-  floating_window_android: ^1.1.1
+  scrollable_positioned_list: ^0.3.8
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
