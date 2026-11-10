@@ -15,6 +15,7 @@ class SpeechController extends ChangeNotifier {
   int _index = -1;
   bool _cancelled = false;
   bool _ready = false;
+  double _rate = 0.5; // Default speed is 0.5
 
   SentenceRef? get current =>
       (_index >= 0 && _index < _queue.length) ? _queue[_index] : null;
@@ -23,9 +24,14 @@ class SpeechController extends ChangeNotifier {
   Future<void> _init() async {
     if (_ready) return;
     await tts.awaitSpeakCompletion(true);
-    await tts.setSpeechRate(0.5);
+    await tts.setSpeechRate(_rate);
     await tts.setPitch(1.0);
     _ready = true;
+  }
+
+  Future<void> setRate(double rate) async {
+    _rate = rate.clamp(0.1, 2.0); // Android range is 0.0–2.0 [2†L5-L6]
+    await tts.setSpeechRate(_rate);
   }
 
   Future<void> speak(
@@ -46,6 +52,25 @@ class SpeechController extends ChangeNotifier {
     if (!_cancelled) {
       _index = -1;
       notifyListeners();
+    }
+  }
+
+  // Skip forward / backward
+  void skipNext() {
+    if (current != null) {
+      _index = (_index + 1).clamp(0, _queue.length - 1);
+      notifyListeners();
+      tts.stop();
+      speak(_queue, _index, []); // Re-start from the new index
+    }
+  }
+
+  void skipPrev() {
+    if (current != null) {
+      _index = (_index - 1).clamp(0, _queue.length - 1);
+      notifyListeners();
+      tts.stop();
+      speak(_queue, _index, []);
     }
   }
 
