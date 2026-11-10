@@ -79,7 +79,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         });
         
         // Update the Android Notification with the new chapter name
-        audioHandler.mediaItem.add(MediaItem(
+        audioHandler.updateMediaItem(MediaItem(
           id: widget.filePath,
           album: _book!.author,
           title: _book!.title,
@@ -141,19 +141,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final q = _queueForAllChapters();
     
     // Send info to Android Notification
-    audioHandler.mediaItem.add(MediaItem(
+    audioHandler.updateMediaItem(MediaItem(
       id: widget.filePath,
       album: _book!.author,
       title: _book!.title,
       artist: _book!.chapters[_chapter].title,
-    ));
-    audioHandler.playbackState.add(audioHandler.playbackState.value.copyWith(
-      playing: true,
-      controls: [
-        MediaControl.skipToPrevious,
-        MediaControl.pause,
-        MediaControl.skipToNext,
-      ],
     ));
 
     _speech.speak(q, index, _rules);
