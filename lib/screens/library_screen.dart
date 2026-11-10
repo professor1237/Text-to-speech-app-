@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../services/epub_service.dart';
 import '../services/library_db.dart';
 import 'reader_screen.dart';
+import 'settings_sheet.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -58,11 +59,25 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('T2S Reader')),
+      appBar: AppBar(
+        title: const Text('T2S Reader'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.palette),
+            tooltip: 'Appearance',
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => const SettingsSheet(),
+            ),
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _books.isEmpty
-              ? const Center(child: Text('No books yet. Tap + to import an EPUB.'))
+              ? const Center(
+                  child: Text('No books yet. Tap + to import an EPUB.'))
               : ListView.separated(
                   itemCount: _books.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
