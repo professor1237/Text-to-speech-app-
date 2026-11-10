@@ -27,19 +27,25 @@ class _ParagraphViewState extends State<ParagraphView> {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveStyle = widget.style.copyWith(
+      color: widget.style.color ??
+          Theme.of(context).colorScheme.onSurface,
+    );
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onDoubleTapDown: (d) {
         final ro = _key.currentContext?.findRenderObject();
         if (ro is! RenderParagraph) return;
-        final pos = ro.getPositionForOffset(ro.globalToLocal(d.globalPosition));
+        final pos =
+            ro.getPositionForOffset(ro.globalToLocal(d.globalPosition));
         widget.onDoubleTapChar(pos.offset);
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         child: RichText(
           key: _key,
-          text: TextSpan(style: widget.style, children: _spans()),
+          text: TextSpan(style: effectiveStyle, children: _spans()),
         ),
       ),
     );
