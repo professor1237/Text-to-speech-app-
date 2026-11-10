@@ -1,4 +1,4 @@
-# T2S Reader
+# TTS Reader
 
 A text-to-speech reader for Android. Import a book or document, press play, and
 listen while the app highlights each sentence and scrolls along with the voice.
