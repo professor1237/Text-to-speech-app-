@@ -1,0 +1,22 @@
+name: t2s_reader
+description: Text-to-speech EPUB reader with system voice, term replacement, scroll reading.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_tts: ^4.2.0
+  epubx: ^4.0.0
+  html: ^0.15.4
+  file_picker: ^8.0.0
+  path_provider: ^2.1.4
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  shared_preferences: ^2.3.0
+
+flutter:
+  uses-material-design: true
