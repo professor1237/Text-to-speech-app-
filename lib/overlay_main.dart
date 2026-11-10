@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-// This annotation is REQUIRED so Android can start this as a separate entry point.
 @pragma("vm:entry-point")
 void overlayMain() {
   runApp(
@@ -27,7 +26,7 @@ class MiniPlayerOverlay extends StatelessWidget {
               'T2S Reader',
               style: TextStyle(color: Colors.white, fontSize: 16),
             ),
-            Icon(Icons.stop, color: Colors.white, size: 40),
+            Icon(Icons.close, color: Colors.white, size: 40), // Changed to Cancel
           ],
         ),
       ),

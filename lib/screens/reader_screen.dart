@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,11 +9,11 @@ import '../models/sentence.dart';
 import '../models/term_rule.dart';
 import '../services/epub_service.dart';
 import '../services/settings_service.dart';
-import '../services/floating_window_service.dart';
 import '../services/speech_controller.dart';
 import '../widgets/paragraph_view.dart';
 import 'settings_sheet.dart';
 import 'terms_screen.dart';
+import '../main.dart'; // To access the global audioHandler
 
 class ReaderScreen extends StatefulWidget {
   final String filePath;
@@ -25,7 +26,7 @@ class ReaderScreen extends StatefulWidget {
 }
 
 class _ReaderScreenState extends State<ReaderScreen> {
-  final _speech = SpeechController();
+  final _speech = SpeechController.instance;
   final _scroll = ScrollController();
   final Map<int, GlobalKey> _keys = {};
 
@@ -63,7 +64,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void dispose() {
     _speech.removeListener(_onSpeechChanged);
     SettingsService.fontScale.removeListener(_onSettingsChanged);
-    _speech.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -71,26 +71,44 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _onSpeechChanged() {
     final cur = _speech.current;
     if (cur != null) {
-      final ctx = _keys[cur.block]?.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 300),
-          alignment: 0.4,
-          curve: Curves.easeOut,
-        );
+      // FIX: Switch chapter automatically if the speech moves to a new one
+      if (cur.chapter != _chapter) {
+        setState(() {
+          _chapter = cur.chapter;
+          _keys.clear();
+        });
+        
+        // Update the Android Notification with the new chapter name
+        audioHandler.mediaItem.add(MediaItem(
+          id: widget.filePath,
+          album: _book!.author,
+          title: _book!.title,
+          artist: _book!.chapters[cur.chapter].title,
+        ));
       }
+
+      // FIX: Wait for the UI to rebuild before trying to scroll
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _keys[cur.block]?.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 300),
+            alignment: 0.4,
+            curve: Curves.easeOut,
+          );
+        }
+      });
     }
     setState(() {});
   }
 
-  // Builds a queue from ALL chapters starting at chapter 0
   List<SentenceRef> _queueForAllChapters() {
     final q = <SentenceRef>[];
     for (int c = 0; c < _book!.chapters.length; c++) {
       for (int b = 0; b < _book!.chapters[c].blocks.length; b++) {
         for (final s in splitSentences(_book!.chapters[c].blocks[b].text)) {
-          q.add(SentenceRef(b, s)); // Note: block index is relative to chapter
+          q.add(SentenceRef(c, b, s)); 
         }
       }
     }
@@ -98,9 +116,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _onDoubleTap(int blockIdx, int charIdx) {
-    final blocks = _book!.chapters[_chapter].blocks;
     final q = _queueForAllChapters();
-    // Find the global index for the tapped sentence
     int target = 0;
     int counter = 0;
     for (int c = 0; c < _book!.chapters.length; c++) {
@@ -113,13 +129,34 @@ class _ReaderScreenState extends State<ReaderScreen> {
         }
       }
     }
-    _speech.speak(q, target, _rules);
+    _playFrom(target);
   }
 
   void _play() {
     if (_book == null) return;
+    _playFrom(0);
+  }
+
+  void _playFrom(int index) {
     final q = _queueForAllChapters();
-    _speech.speak(q, 0, _rules); // Start from beginning
+    
+    // Send info to Android Notification
+    audioHandler.mediaItem.add(MediaItem(
+      id: widget.filePath,
+      album: _book!.author,
+      title: _book!.title,
+      artist: _book!.chapters[_chapter].title,
+    ));
+    audioHandler.playbackState.add(audioHandler.playbackState.value.copyWith(
+      playing: true,
+      controls: [
+        MediaControl.skipToPrevious,
+        MediaControl.pause,
+        MediaControl.skipToNext,
+      ],
+    ));
+
+    _speech.speak(q, index, _rules);
   }
 
   Future<void> _openTerms() async {
@@ -157,17 +194,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ? 'Chapter ${_chapter + 1}'
                 : _book!.chapters[_chapter].title),
         actions: [
-  IconButton(
-    icon: const Icon(Icons.picture_in_picture_alt),
-    tooltip: 'Floating Player',
-    onPressed: () => FloatingWindowService.showFloatingPlayer(),
-  ),
-  IconButton(
-    icon: const Icon(Icons.tune),
-    tooltip: 'Term replacement',
-    onPressed: _openTerms,
-  ),
-],
+          // Removed the Picture-in-Picture button as requested
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Term replacement',
+            onPressed: _openTerms,
+          ),
+        ],
       ),
       drawer: _book == null
           ? null
@@ -301,7 +334,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         final block = chapter.blocks[i];
         final key = _keys.putIfAbsent(i, () => GlobalKey());
         int? hs, he;
-        if (cur != null && cur.block == i) {
+        // FIX: Only highlight if the speech is in THIS chapter and block
+        if (cur != null && cur.chapter == _chapter && cur.block == i) {
           hs = cur.sentence.start;
           he = cur.sentence.end;
         }

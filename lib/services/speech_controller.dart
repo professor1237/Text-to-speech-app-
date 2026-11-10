@@ -4,22 +4,28 @@ import '../models/sentence.dart';
 import '../models/term_rule.dart';
 
 class SentenceRef {
+  final int chapter;
   final int block;
   final Sentence sentence;
-  const SentenceRef(this.block, this.sentence);
+  const SentenceRef(this.chapter, this.block, this.sentence);
 }
 
 class SpeechController extends ChangeNotifier {
+  static final SpeechController instance = SpeechController._();
+  
   final FlutterTts tts = FlutterTts();
   List<SentenceRef> _queue = [];
   int _index = -1;
   bool _cancelled = false;
   bool _ready = false;
-  double _rate = 0.5; // Default speed is 0.5
+  double _rate = 0.5;
+  List<TermRule> _lastRules = [];
 
   SentenceRef? get current =>
       (_index >= 0 && _index < _queue.length) ? _queue[_index] : null;
   bool get isSpeaking => _index >= 0;
+
+  SpeechController._();
 
   Future<void> _init() async {
     if (_ready) return;
@@ -30,7 +36,7 @@ class SpeechController extends ChangeNotifier {
   }
 
   Future<void> setRate(double rate) async {
-    _rate = rate.clamp(0.1, 2.0); // Android range is 0.0–2.0 [2†L5-L6]
+    _rate = rate.clamp(0.1, 2.0);
     await tts.setSpeechRate(_rate);
   }
 
@@ -40,6 +46,7 @@ class SpeechController extends ChangeNotifier {
     await _cancel();
     _cancelled = false;
     _queue = queue;
+    _lastRules = rules;
 
     for (int i = start; i < queue.length; i++) {
       if (_cancelled) return;
@@ -55,13 +62,18 @@ class SpeechController extends ChangeNotifier {
     }
   }
 
-  // Skip forward / backward
+  void resume() {
+    if (_queue.isNotEmpty && _index >= 0) {
+      speak(_queue, _index, _lastRules);
+    }
+  }
+
   void skipNext() {
     if (current != null) {
       _index = (_index + 1).clamp(0, _queue.length - 1);
       notifyListeners();
       tts.stop();
-      speak(_queue, _index, []); // Re-start from the new index
+      speak(_queue, _index, _lastRules);
     }
   }
 
@@ -70,7 +82,7 @@ class SpeechController extends ChangeNotifier {
       _index = (_index - 1).clamp(0, _queue.length - 1);
       notifyListeners();
       tts.stop();
-      speak(_queue, _index, []);
+      speak(_queue, _index, _lastRules);
     }
   }
 
@@ -85,11 +97,5 @@ class SpeechController extends ChangeNotifier {
     try {
       await tts.stop();
     } catch (_) {}
-  }
-
-  @override
-  void dispose() {
-    tts.stop();
-    super.dispose();
   }
 }
