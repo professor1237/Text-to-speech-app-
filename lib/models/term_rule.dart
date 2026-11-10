@@ -47,14 +47,31 @@ class TermRule {
       );
 }
 
+final Map<String, RegExp?> _patternCache = {};
+
+RegExp? _patternFor(TermRule r) {
+  final key = '${r.regex}|${r.caseSensitive}|${r.find}';
+  if (_patternCache.containsKey(key)) return _patternCache[key];
+  RegExp? p;
+  try {
+    p = RegExp(
+      r.regex ? r.find : RegExp.escape(r.find),
+      caseSensitive: r.caseSensitive,
+    );
+  } catch (_) {
+    p = null; // invalid regex: skip the rule instead of crashing
+  }
+  _patternCache[key] = p;
+  return p;
+}
+
 String applyTermRules(String input, List<TermRule> rules) {
   var out = input;
   for (final r in rules) {
     if (!r.enabled || r.find.isEmpty) continue;
-    final pattern = r.regex
-        ? RegExp(r.find, caseSensitive: r.caseSensitive)
-        : RegExp(RegExp.escape(r.find), caseSensitive: r.caseSensitive);
-    out = out.replaceAll(pattern, r.replace);
+    final p = _patternFor(r);
+    if (p == null) continue;
+    out = out.replaceAll(p, r.replace);
   }
   return out;
 }
