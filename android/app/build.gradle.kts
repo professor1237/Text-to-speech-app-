@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.t2s_reader"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
