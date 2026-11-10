@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../main.dart'; // global audioHandler
 import '../models/block.dart';
 import '../models/sentence.dart';
 import '../models/term_rule.dart';
@@ -13,13 +15,11 @@ import '../services/speech_controller.dart';
 import '../widgets/paragraph_view.dart';
 import 'settings_sheet.dart';
 import 'terms_screen.dart';
-import '../main.dart'; // To access the global audioHandler
 
 class ReaderScreen extends StatefulWidget {
   final String filePath;
   final String title;
-  const ReaderScreen(
-      {super.key, required this.filePath, required this.title});
+  const ReaderScreen({super.key, required this.filePath, required this.title});
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -27,128 +27,187 @@ class ReaderScreen extends StatefulWidget {
 
 class _ReaderScreenState extends State<ReaderScreen> {
   final _speech = SpeechController.instance;
-  final _scroll = ScrollController();
-  final Map<int, GlobalKey> _keys = {};
+  final _itemScroll = ItemScrollController();
 
   BookContent? _book;
-  int _chapter = 0;
+  List<SentenceRef> _queue = [];
   List<TermRule> _rules = [];
+  int _chapter = 0;
+  int _startIndex = 0; // where Play begins / last reading position
+  int _lastChapter = -1;
+  int _lastBlock = -1;
   String? _error;
   double _speed = 0.5;
+
+  String get _posKey => 'pos_${widget.filePath}';
 
   @override
   void initState() {
     super.initState();
+    // Opening a different book resets playback of the old one.
+    if (_speech.owner != widget.filePath) _speech.stop();
     _speech.addListener(_onSpeechChanged);
     SettingsService.fontScale.addListener(_onSettingsChanged);
     _load();
-  }
-
-  void _onSettingsChanged() {
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _load() async {
-    try {
-      final bytes = await File(widget.filePath).readAsBytes();
-      final book = await EpubService.parse(bytes);
-      final prefs = await SharedPreferences.getInstance();
-      _rules = decodeRules(prefs.getString('term_rules'));
-      setState(() => _book = book);
-    } catch (e) {
-      setState(() => _error = e.toString());
-    }
   }
 
   @override
   void dispose() {
     _speech.removeListener(_onSpeechChanged);
     SettingsService.fontScale.removeListener(_onSettingsChanged);
-    _scroll.dispose();
     super.dispose();
   }
 
-  void _onSpeechChanged() {
-    final cur = _speech.current;
-    if (cur != null) {
-      // FIX: Switch chapter automatically if the speech moves to a new one
-      if (cur.chapter != _chapter) {
-        setState(() {
-          _chapter = cur.chapter;
-          _keys.clear();
-        });
-        
-        // Update the Android Notification with the new chapter name
-        audioHandler.updateMediaItem(MediaItem(
-          id: widget.filePath,
-          album: _book!.author,
-          title: _book!.title,
-          artist: _book!.chapters[cur.chapter].title,
-        ));
-      }
-
-      // FIX: Wait for the UI to rebuild before trying to scroll
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ctx = _keys[cur.block]?.currentContext;
-        if (ctx != null) {
-          Scrollable.ensureVisible(
-            ctx,
-            duration: const Duration(milliseconds: 300),
-            alignment: 0.4,
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
-    setState(() {});
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
-  List<SentenceRef> _queueForAllChapters() {
+  // ---------- loading ----------
+
+  List<SentenceRef> _buildQueue(BookContent book) {
     final q = <SentenceRef>[];
-    for (int c = 0; c < _book!.chapters.length; c++) {
-      for (int b = 0; b < _book!.chapters[c].blocks.length; b++) {
-        for (final s in splitSentences(_book!.chapters[c].blocks[b].text)) {
-          q.add(SentenceRef(c, b, s)); 
+    for (int c = 0; c < book.chapters.length; c++) {
+      final blocks = book.chapters[c].blocks;
+      for (int b = 0; b < blocks.length; b++) {
+        for (final s in splitSentences(blocks[b].text)) {
+          q.add(SentenceRef(c, b, s));
         }
       }
     }
     return q;
   }
 
-  void _onDoubleTap(int blockIdx, int charIdx) {
-    final q = _queueForAllChapters();
-    int target = 0;
-    int counter = 0;
-    for (int c = 0; c < _book!.chapters.length; c++) {
-      for (int b = 0; b < _book!.chapters[c].blocks.length; b++) {
-        for (final s in splitSentences(_book!.chapters[c].blocks[b].text)) {
-          if (c == _chapter && b == blockIdx && s.start <= charIdx) {
-            target = counter;
-          }
-          counter++;
-        }
+  Future<void> _load() async {
+    try {
+      final bytes = await File(widget.filePath).readAsBytes();
+      final book = await EpubService.parse(bytes);
+      if (book.chapters.isEmpty) {
+        throw Exception('No readable text found in this book.');
       }
+      final prefs = await SharedPreferences.getInstance();
+      final rules = decodeRules(prefs.getString('term_rules'));
+      final queue = _buildQueue(book);
+
+      var start = prefs.getInt(_posKey) ?? 0;
+      if (_speech.owner == widget.filePath && _speech.index >= 0) {
+        start = _speech.index; // re-opened while still speaking
+      }
+      if (start < 0 || start >= queue.length) start = 0;
+
+      _speech.setRules(rules);
+      if (!mounted) return;
+      setState(() {
+        _book = book;
+        _queue = queue;
+        _rules = rules;
+        _startIndex = start;
+        _chapter = queue.isEmpty ? 0 : queue[start].chapter;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
     }
-    _playFrom(target);
   }
 
-  void _play() {
-    if (_book == null) return;
-    _playFrom(0);
+  Future<void> _savePosition() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_posKey, _startIndex);
   }
 
-  void _playFrom(int index) {
-    final q = _queueForAllChapters();
-    
-    // Send info to Android Notification
+  // ---------- speech ----------
+
+  String _chapterTitle(int i) {
+    final t = _book!.chapters[i].title.trim();
+    return t.isEmpty ? 'Chapter ${i + 1}' : t;
+  }
+
+  void _updateMediaItem(int chapter) {
     audioHandler.updateMediaItem(MediaItem(
       id: widget.filePath,
       album: _book!.author,
       title: _book!.title,
-      artist: _book!.chapters[_chapter].title,
+      artist: _chapterTitle(chapter),
     ));
+  }
 
-    _speech.speak(q, index, _rules);
+  void _onSpeechChanged() {
+    if (!mounted || _book == null) return;
+    final cur = _speech.current;
+    if (cur != null && _speech.owner == widget.filePath) {
+      _startIndex = _speech.index;
+      _savePosition();
+      if (cur.chapter != _chapter) {
+        setState(() => _chapter = cur.chapter);
+        _updateMediaItem(cur.chapter);
+      }
+      _followBlock(cur.chapter, cur.block);
+    }
+    setState(() {});
+  }
+
+  void _followBlock(int chapter, int block) {
+    if (chapter == _lastChapter && block == _lastBlock) return;
+    _lastChapter = chapter;
+    _lastBlock = block;
+    _scrollToBlock(block, 3);
+  }
+
+  void _scrollToBlock(int block, int tries) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_itemScroll.isAttached) {
+        _itemScroll.scrollTo(
+          index: block,
+          alignment: 0.3,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } else if (tries > 0) {
+        _scrollToBlock(block, tries - 1);
+      }
+    });
+  }
+
+  void _playFrom(int index) {
+    if (_book == null || _queue.isEmpty) return;
+    if (index < 0 || index >= _queue.length) index = 0;
+    _startIndex = index;
+    _updateMediaItem(_queue[index].chapter);
+    _speech.speak(_queue, index, _rules, owner: widget.filePath);
+  }
+
+  int _startForCurrentChapter() {
+    if (_startIndex >= 0 &&
+        _startIndex < _queue.length &&
+        _queue[_startIndex].chapter == _chapter) {
+      return _startIndex;
+    }
+    final i = _queue.indexWhere((s) => s.chapter == _chapter);
+    return i < 0 ? 0 : i;
+  }
+
+  void _togglePlay() {
+    if (_speech.state == SpeechState.playing) {
+      _speech.pause();
+    } else if (_speech.state == SpeechState.paused &&
+        _speech.owner == widget.filePath) {
+      _speech.resume();
+    } else {
+      _playFrom(_startForCurrentChapter());
+    }
+  }
+
+  void _onDoubleTap(int blockIdx, int charIdx) {
+    int target = -1;
+    for (int i = 0; i < _queue.length; i++) {
+      final r = _queue[i];
+      if (r.chapter != _chapter) {
+        if (target >= 0) break; // already passed our chapter
+        continue;
+      }
+      if (r.block > blockIdx) break;
+      if (r.block == blockIdx && r.sentence.start <= charIdx) target = i;
+    }
+    if (target >= 0) _playFrom(target);
   }
 
   Future<void> _openTerms() async {
@@ -157,16 +216,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
       MaterialPageRoute(builder: (_) => TermsScreen(rules: _rules)),
     );
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _rules = decodeRules(prefs.getString('term_rules')));
+    final rules = decodeRules(prefs.getString('term_rules'));
+    _speech.setRules(rules);
+    if (mounted) setState(() => _rules = rules);
   }
+
+  // ---------- UI ----------
 
   TextStyle _styleFor(BlockType t) {
     final scale = SettingsService.fontScale.value;
     final base = TextStyle(fontSize: 18 * scale, height: 1.55);
     switch (t) {
       case BlockType.heading:
-        return base.copyWith(
-            fontSize: 22 * scale, fontWeight: FontWeight.bold);
+        return base.copyWith(fontSize: 22 * scale, fontWeight: FontWeight.bold);
       case BlockType.quote:
         return base.copyWith(fontStyle: FontStyle.italic);
       case BlockType.listItem:
@@ -177,16 +239,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final speaking = _speech.isSpeaking;
+    final active = _speech.isActive;
+    final playing = _speech.isPlaying;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_book == null
-            ? widget.title
-            : _book!.chapters[_chapter].title.isEmpty
-                ? 'Chapter ${_chapter + 1}'
-                : _book!.chapters[_chapter].title),
+        title: Text(_book == null ? widget.title : _chapterTitle(_chapter)),
         actions: [
-          // Removed the Picture-in-Picture button as requested
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: 'Term replacement',
@@ -201,24 +259,33 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 itemCount: _book!.chapters.length,
                 itemBuilder: (_, i) => ListTile(
                   title: Text(
-                    _book!.chapters[i].title.isEmpty
-                        ? 'Chapter ${i + 1}'
-                        : _book!.chapters[i].title,
+                    _chapterTitle(i),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   selected: i == _chapter,
                   onTap: () {
                     _speech.stop();
-                    _keys.clear();
-                    setState(() => _chapter = i);
+                    final first = _queue.indexWhere((s) => s.chapter == i);
+                    setState(() {
+                      _chapter = i;
+                      _startIndex = first < 0 ? 0 : first;
+                      _lastChapter = -1;
+                      _lastBlock = -1;
+                    });
+                    _savePosition();
                     Navigator.pop(context);
                   },
                 ),
               ),
             ),
       body: _error != null
-          ? Center(child: Text(_error!))
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(_error!),
+              ),
+            )
           : _book == null
               ? const Center(child: CircularProgressIndicator())
               : _buildReader(),
@@ -239,25 +306,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           icon: const Icon(Icons.skip_previous),
                           iconSize: 32,
                           tooltip: 'Previous sentence',
-                          onPressed: speaking ? _speech.skipPrev : null,
+                          onPressed: active ? () => _speech.skipPrev() : null,
                         ),
                         IconButton(
-                          icon: const Icon(Icons.play_circle),
+                          icon: Icon(
+                              playing ? Icons.pause_circle : Icons.play_circle),
                           iconSize: 40,
-                          tooltip: 'Play',
-                          onPressed: speaking ? null : _play,
+                          tooltip: playing ? 'Pause' : 'Play',
+                          onPressed: _togglePlay,
                         ),
                         IconButton(
                           icon: const Icon(Icons.stop_circle),
                           iconSize: 40,
                           tooltip: 'Stop',
-                          onPressed: speaking ? () => _speech.stop() : null,
+                          onPressed: active ? () => _speech.stop() : null,
                         ),
                         IconButton(
                           icon: const Icon(Icons.skip_next),
                           iconSize: 32,
                           tooltip: 'Next sentence',
-                          onPressed: speaking ? _speech.skipNext : null,
+                          onPressed: active ? () => _speech.skipNext() : null,
                         ),
                       ],
                     ),
@@ -317,22 +385,30 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Widget _buildReader() {
     final chapter = _book!.chapters[_chapter];
-    final cur = _speech.current;
-    return ListView.builder(
-      controller: _scroll,
+    final cur = _speech.owner == widget.filePath ? _speech.current : null;
+
+    int initial = 0;
+    if (_startIndex >= 0 &&
+        _startIndex < _queue.length &&
+        _queue[_startIndex].chapter == _chapter) {
+      initial = _queue[_startIndex].block;
+    }
+    if (initial >= chapter.blocks.length) initial = 0;
+
+    return ScrollablePositionedList.builder(
+      key: ValueKey(_chapter),
+      itemScrollController: _itemScroll,
+      initialScrollIndex: initial,
       padding: const EdgeInsets.only(top: 8, bottom: 16),
       itemCount: chapter.blocks.length,
       itemBuilder: (_, i) {
         final block = chapter.blocks[i];
-        final key = _keys.putIfAbsent(i, () => GlobalKey());
         int? hs, he;
-        // FIX: Only highlight if the speech is in THIS chapter and block
         if (cur != null && cur.chapter == _chapter && cur.block == i) {
           hs = cur.sentence.start;
           he = cur.sentence.end;
         }
         return ParagraphView(
-          key: key,
           block: block,
           highlightStart: hs,
           highlightEnd: he,

@@ -2,31 +2,39 @@ import 'package:audio_service/audio_service.dart';
 import 'speech_controller.dart';
 
 class TtsAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
-  @override
-  Future<void> play() async {
-    // Set the notification to show "Playing"
-    playbackState.add(playbackState.value.copyWith(
-      processingState: AudioProcessingState.ready,
-      playing: true,
+  TtsAudioHandler() {
+    SpeechController.instance.onStateChanged = _sync;
+  }
+
+  void _sync(SpeechState s) {
+    final playing = s == SpeechState.playing;
+    playbackState.add(PlaybackState(
+      controls: [
+        MediaControl.skipToPrevious,
+        playing ? MediaControl.pause : MediaControl.play,
+        MediaControl.stop,
+        MediaControl.skipToNext,
+      ],
+      androidCompactActionIndices: const [0, 1, 3],
+      processingState: s == SpeechState.stopped
+          ? AudioProcessingState.idle
+          : AudioProcessingState.ready,
+      playing: playing,
     ));
-    SpeechController.instance.resume();
   }
 
   @override
-  Future<void> pause() async {
-    await SpeechController.instance.stop();
-    playbackState.add(playbackState.value.copyWith(
-      processingState: AudioProcessingState.ready,
-      playing: false,
-    ));
-  }
+  Future<void> play() => SpeechController.instance.resume();
 
   @override
-  Future<void> stop() async {
-    await SpeechController.instance.stop();
-    playbackState.add(playbackState.value.copyWith(
-      processingState: AudioProcessingState.idle,
-      playing: false,
-    ));
-  }
+  Future<void> pause() => SpeechController.instance.pause();
+
+  @override
+  Future<void> stop() => SpeechController.instance.stop();
+
+  @override
+  Future<void> skipToNext() => SpeechController.instance.skipNext();
+
+  @override
+  Future<void> skipToPrevious() => SpeechController.instance.skipPrev();
 }
