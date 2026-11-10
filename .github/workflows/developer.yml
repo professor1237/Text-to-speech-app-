@@ -1,4 +1,4 @@
-name: Build and Update Developer
+name: Build and Update Developer Release
 
 on:
   push:
@@ -11,31 +11,31 @@ permissions:
   contents: write
 
 concurrency:
-  group: developer-build
-  cancel-in-progress: true
+  group: developer-release
+  cancel-in-progress: false
 
 jobs:
   build:
-    name: Build Android Developer APK
+    name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      # Checkout
+
+      # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Java
+      # 2. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
-      # Flutter
+      # 3. Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -43,53 +43,63 @@ jobs:
           cache: true
           pub-cache: true
 
-      # Gradle cache
+      # 4. Gradle caching
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Dependencies
+      # 5. Install dependencies
       - name: Install Dependencies
         run: flutter pub get
 
-      # Build APK
-      - name: Build Developer APK
+      # 6. Build ARM64 APK
+      - name: Build Release APK
         run: |
           flutter build apk \
             --release \
-            --target-platform android-arm64,android-x64
+            --target-platform android-arm64
 
-      # Verify
+      # 7. Verify APK
       - name: Verify APK
         run: |
           APK="build/app/outputs/flutter-apk/app-release.apk"
-          test -f "$APK"
+
+          if [ ! -f "$APK" ]; then
+            echo "APK not found!"
+            exit 1
+          fi
+
+          echo "APK successfully generated:"
           ls -lh "$APK"
 
-      # Update developer tag
+      # 8. Update Developer tag
       - name: Update Developer Tag
         run: |
           git tag -f developer "$GITHUB_SHA"
           git push --force origin refs/tags/developer
 
-      # Publish
+      # 9. Publish Developer Release
       - name: Update Developer Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: developer
           name: Developer Build
+
           body: |
-            ## Developer Version
+            # Developer Version
 
             Automatically updated from the latest main branch.
 
             Commit: ${{ github.sha }}
 
             This is a testing release.
+
           files: |
             build/app/outputs/flutter-apk/app-release.apk
+
+          overwrite_files: true
+          fail_on_unmatched_files: true
           prerelease: true
           make_latest: false
-          fail_on_unmatched_files: true
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
