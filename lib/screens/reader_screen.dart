@@ -10,12 +10,20 @@ import '../main.dart'; // global audioHandler
 import '../models/block.dart';
 import '../models/sentence.dart';
 import '../models/term_rule.dart';
+import '../services/book_parser.dart';
 import '../services/epub_service.dart';
 import '../services/settings_service.dart';
 import '../services/speech_controller.dart';
 import '../widgets/paragraph_view.dart';
 import 'settings_sheet.dart';
 import 'terms_screen.dart';
+
+/// What the background worker needs.
+class _LoadRequest {
+  final String path;
+  final String title;
+  const _LoadRequest(this.path, this.title);
+}
 
 /// Result of loading a book in the background.
 class _LoadedBook {
@@ -24,10 +32,10 @@ class _LoadedBook {
   _LoadedBook(this.book, this.queue);
 }
 
-/// Runs in a background isolate: read file, parse EPUB, split sentences.
-Future<_LoadedBook> _loadBookInBackground(String path) async {
-  final bytes = await File(path).readAsBytes();
-  final book = await EpubService.parse(bytes);
+/// Runs in a background isolate: read file, parse it, split sentences.
+Future<_LoadedBook> _loadBookInBackground(_LoadRequest req) async {
+  final bytes = await File(req.path).readAsBytes();
+  final book = await BookParser.parse(BookInput(req.path, bytes, req.title));
   final q = <SentenceRef>[];
   for (int c = 0; c < book.chapters.length; c++) {
     final blocks = book.chapters[c].blocks;
@@ -91,7 +99,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _load() async {
     try {
       // Heavy work runs in the background so the app never freezes.
-      final loaded = await compute(_loadBookInBackground, widget.filePath);
+      final loaded = await compute(
+        _loadBookInBackground,
+        _LoadRequest(widget.filePath, widget.title),
+      );
       final book = loaded.book;
       final queue = loaded.queue;
       if (book.chapters.isEmpty) {
