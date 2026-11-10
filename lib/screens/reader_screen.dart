@@ -32,6 +32,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   int _chapter = 0;
   List<TermRule> _rules = [];
   String? _error;
+  double _speed = 0.5;
 
   @override
   void initState() {
@@ -82,11 +83,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
     setState(() {});
   }
 
-  List<SentenceRef> _queueFor(List<Block> blocks) {
+  // Builds a queue from ALL chapters starting at chapter 0
+  List<SentenceRef> _queueForAllChapters() {
     final q = <SentenceRef>[];
-    for (int b = 0; b < blocks.length; b++) {
-      for (final s in splitSentences(blocks[b].text)) {
-        q.add(SentenceRef(b, s));
+    for (int c = 0; c < _book!.chapters.length; c++) {
+      for (int b = 0; b < _book!.chapters[c].blocks.length; b++) {
+        for (final s in splitSentences(_book!.chapters[c].blocks[b].text)) {
+          q.add(SentenceRef(b, s)); // Note: block index is relative to chapter
+        }
       }
     }
     return q;
@@ -94,19 +98,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _onDoubleTap(int blockIdx, int charIdx) {
     final blocks = _book!.chapters[_chapter].blocks;
-    final q = _queueFor(blocks);
+    final q = _queueForAllChapters();
+    // Find the global index for the tapped sentence
     int target = 0;
-    for (int i = 0; i < q.length; i++) {
-      final r = q[i];
-      if (r.block < blockIdx) {
-        target = i;
-        continue;
-      }
-      if (r.block > blockIdx) break;
-      if (r.sentence.start <= charIdx) {
-        target = i;
-      } else {
-        break;
+    int counter = 0;
+    for (int c = 0; c < _book!.chapters.length; c++) {
+      for (int b = 0; b < _book!.chapters[c].blocks.length; b++) {
+        for (final s in splitSentences(_book!.chapters[c].blocks[b].text)) {
+          if (c == _chapter && b == blockIdx && s.start <= charIdx) {
+            target = counter;
+          }
+          counter++;
+        }
       }
     }
     _speech.speak(q, target, _rules);
@@ -114,8 +117,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _play() {
     if (_book == null) return;
-    final blocks = _book!.chapters[_chapter].blocks;
-    _speech.speak(_queueFor(blocks), 0, _rules);
+    final q = _queueForAllChapters();
+    _speech.speak(q, 0, _rules); // Start from beginning
   }
 
   Future<void> _openTerms() async {
@@ -195,44 +198,84 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.play_circle),
-                      iconSize: 36,
-                      tooltip: 'Play',
-                      onPressed: speaking ? null : _play,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.skip_previous),
+                          iconSize: 32,
+                          tooltip: 'Previous sentence',
+                          onPressed: speaking ? _speech.skipPrev : null,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.play_circle),
+                          iconSize: 40,
+                          tooltip: 'Play',
+                          onPressed: speaking ? null : _play,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.stop_circle),
+                          iconSize: 40,
+                          tooltip: 'Stop',
+                          onPressed: speaking ? () => _speech.stop() : null,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.skip_next),
+                          iconSize: 32,
+                          tooltip: 'Next sentence',
+                          onPressed: speaking ? _speech.skipNext : null,
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.stop_circle),
-                      iconSize: 36,
-                      tooltip: 'Stop',
-                      onPressed: speaking ? () => _speech.stop() : null,
+                    Row(
+                      children: [
+                        const Icon(Icons.speed, size: 20),
+                        Expanded(
+                          child: Slider(
+                            value: _speed,
+                            min: 0.1,
+                            max: 2.0,
+                            divisions: 19,
+                            label: '${(_speed * 100).round()}%',
+                            onChanged: (v) {
+                              setState(() => _speed = v);
+                              _speech.setRate(v);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.text_decrease),
-                      iconSize: 28,
-                      tooltip: 'Smaller text',
-                      onPressed: () => SettingsService.setFontScale(
-                          SettingsService.fontScale.value - 0.1),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.text_increase),
-                      iconSize: 28,
-                      tooltip: 'Larger text',
-                      onPressed: () => SettingsService.setFontScale(
-                          SettingsService.fontScale.value + 0.1),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.palette),
-                      iconSize: 28,
-                      tooltip: 'Appearance',
-                      onPressed: () => showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => const SettingsSheet(),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.text_decrease),
+                          iconSize: 28,
+                          tooltip: 'Smaller text',
+                          onPressed: () => SettingsService.setFontScale(
+                              SettingsService.fontScale.value - 0.1),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.text_increase),
+                          iconSize: 28,
+                          tooltip: 'Larger text',
+                          onPressed: () => SettingsService.setFontScale(
+                              SettingsService.fontScale.value + 0.1),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.palette),
+                          iconSize: 28,
+                          tooltip: 'Appearance',
+                          onPressed: () => showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) => const SettingsSheet(),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
