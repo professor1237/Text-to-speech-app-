@@ -15,6 +15,13 @@ class TtsAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         MediaControl.stop,
         MediaControl.skipToNext,
       ],
+      systemActions: const {
+        MediaAction.play,
+        MediaAction.pause,
+        MediaAction.stop,
+        MediaAction.skipToNext,
+        MediaAction.skipToPrevious,
+      },
       androidCompactActionIndices: const [0, 1, 3],
       processingState: s == SpeechState.stopped
           ? AudioProcessingState.idle

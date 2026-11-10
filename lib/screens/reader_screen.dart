@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,29 @@ import '../services/speech_controller.dart';
 import '../widgets/paragraph_view.dart';
 import 'settings_sheet.dart';
 import 'terms_screen.dart';
+
+/// Result of loading a book in the background.
+class _LoadedBook {
+  final BookContent book;
+  final List<SentenceRef> queue;
+  _LoadedBook(this.book, this.queue);
+}
+
+/// Runs in a background isolate: read file, parse EPUB, split sentences.
+Future<_LoadedBook> _loadBookInBackground(String path) async {
+  final bytes = await File(path).readAsBytes();
+  final book = await EpubService.parse(bytes);
+  final q = <SentenceRef>[];
+  for (int c = 0; c < book.chapters.length; c++) {
+    final blocks = book.chapters[c].blocks;
+    for (int b = 0; b < blocks.length; b++) {
+      for (final s in splitSentences(blocks[b].text)) {
+        q.add(SentenceRef(c, b, s));
+      }
+    }
+  }
+  return _LoadedBook(book, q);
+}
 
 class ReaderScreen extends StatefulWidget {
   final String filePath;
@@ -64,29 +88,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   // ---------- loading ----------
 
-  List<SentenceRef> _buildQueue(BookContent book) {
-    final q = <SentenceRef>[];
-    for (int c = 0; c < book.chapters.length; c++) {
-      final blocks = book.chapters[c].blocks;
-      for (int b = 0; b < blocks.length; b++) {
-        for (final s in splitSentences(blocks[b].text)) {
-          q.add(SentenceRef(c, b, s));
-        }
-      }
-    }
-    return q;
-  }
-
   Future<void> _load() async {
     try {
-      final bytes = await File(widget.filePath).readAsBytes();
-      final book = await EpubService.parse(bytes);
+      // Heavy work runs in the background so the app never freezes.
+      final loaded = await compute(_loadBookInBackground, widget.filePath);
+      final book = loaded.book;
+      final queue = loaded.queue;
       if (book.chapters.isEmpty) {
         throw Exception('No readable text found in this book.');
       }
       final prefs = await SharedPreferences.getInstance();
       final rules = decodeRules(prefs.getString('term_rules'));
-      final queue = _buildQueue(book);
 
       var start = prefs.getInt(_posKey) ?? 0;
       if (_speech.owner == widget.filePath && _speech.index >= 0) {
