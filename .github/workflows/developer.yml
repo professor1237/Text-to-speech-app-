@@ -1,0 +1,95 @@
+name: Build and Update Developer
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: developer-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Android Developer APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # Checkout
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Java
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          pub-cache: true
+
+      # Gradle cache
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Dependencies
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # Build APK
+      - name: Build Developer APK
+        run: |
+          flutter build apk \
+            --release \
+            --target-platform android-arm64,android-x64
+
+      # Verify
+      - name: Verify APK
+        run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -f "$APK"
+          ls -lh "$APK"
+
+      # Update developer tag
+      - name: Update Developer Tag
+        run: |
+          git tag -f developer "$GITHUB_SHA"
+          git push --force origin refs/tags/developer
+
+      # Publish
+      - name: Update Developer Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: developer
+          name: Developer Build
+          body: |
+            ## Developer Version
+
+            Automatically updated from the latest main branch.
+
+            Commit: ${{ github.sha }}
+
+            This is a testing release.
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+          prerelease: true
+          make_latest: false
+          fail_on_unmatched_files: true
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
