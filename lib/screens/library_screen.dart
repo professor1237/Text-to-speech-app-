@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import '../services/epub_service.dart';
+import '../services/book_parser.dart';
 import '../services/library_db.dart';
 import 'reader_screen.dart';
 import 'settings_sheet.dart';
@@ -39,32 +39,44 @@ class _LibraryScreenState extends State<LibraryScreen> {
     });
   }
 
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _import() async {
-    final res = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['epub'],
-    );
+    final res = await FilePicker.platform.pickFiles(type: FileType.any);
     if (res == null || res.files.isEmpty) return;
-    final src = res.files.first.path;
+    final file = res.files.first;
+    final src = file.path;
     if (src == null) return;
+
+    final ext = extensionOf(file.name);
+    if (!supportedBookExtensions.contains(ext)) {
+      _snack('Unsupported file type ".$ext".\n'
+          'Supported: ${supportedBookExtensions.join(', ')}');
+      return;
+    }
 
     setState(() => _importing = true);
     try {
       final bytes = await File(src).readAsBytes();
       // Heavy work runs in the background so the app never freezes.
-      final book = await compute(EpubService.parse, bytes);
+      final book = await compute(
+        BookParser.parse,
+        BookInput(file.name, bytes, baseName(file.name)),
+      );
+      final title = (book.title.trim().isEmpty || book.title == 'Untitled')
+          ? baseName(file.name)
+          : book.title;
       final dir = await getApplicationDocumentsDirectory();
       final dest = p.join(
-          dir.path, 'book_${DateTime.now().millisecondsSinceEpoch}.epub');
+          dir.path, 'book_${DateTime.now().millisecondsSinceEpoch}.$ext');
       await File(dest).writeAsBytes(bytes);
-      await LibraryDB.insert(dest, book.title, book.author, book.cover);
+      await LibraryDB.insert(dest, title, book.author, book.cover);
       await _refresh();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not import this book: $e')),
-        );
-      }
+      _snack('Could not import this file: $e');
     } finally {
       if (mounted) setState(() => _importing = false);
     }
@@ -95,7 +107,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _books.isEmpty
                     ? const Center(
-                        child: Text('No books yet. Tap + to import an EPUB.'))
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'No books yet.\nTap + to import a file.\n\n'
+                            'EPUB, PDF, TXT, DOCX, HTML, MD',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
                     : ListView.separated(
                         itemCount: _books.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
@@ -133,7 +153,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _importing ? null : _import,
-        tooltip: 'Import EPUB',
+        tooltip: 'Import a file',
         child: const Icon(Icons.add),
       ),
     );

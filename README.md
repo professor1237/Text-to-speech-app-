@@ -1,16 +1,28 @@
 # T2S Reader
 
-A text-to-speech EPUB reader for Android. Import a book, press play, and listen
-while the app highlights each sentence and scrolls along with the voice.
+A text-to-speech reader for Android. Import a book or document, press play, and
+listen while the app highlights each sentence and scrolls along with the voice.
+
+## Supported files
+
+| Type | Notes |
+|------|-------|
+| EPUB | Chapters from the book's table of contents, cover image |
+| PDF | Text PDFs only. Pages are grouped into chapters of 5 pages |
+| TXT | Chapters found from "Chapter 1", "Part II" and similar lines |
+| DOCX | Word documents. Headings become chapters |
+| HTML / HTM | Web pages saved as files |
+| MD | Markdown. Headings become chapters, code blocks are skipped |
+
+Scanned PDFs (pictures of pages) and password-protected files cannot be read.
 
 ## Features
 
 **Reading**
-- Imports EPUB 2 and EPUB 3 books
 - Library with cover thumbnails (long-press a book to remove it)
 - Chapter drawer, continuous vertical scrolling
 - Remembers where you stopped in each book
-- Books load in the background, so the app never freezes
+- Files load in the background, so the app never freezes
 
 **Listening**
 - Uses the phone's default text-to-speech voice
@@ -56,7 +68,8 @@ lib/
     sentence.dart            Splits text into sentences
     term_rule.dart           Term replacement rules
   services/
-    epub_service.dart        Reads EPUB files
+    book_parser.dart         Opens PDF, TXT, DOCX, HTML, Markdown
+    epub_service.dart        Opens EPUB
     speech_controller.dart   Play, pause, skip, sentence queue
     audio_handler.dart       Notification and headphone buttons
     library_db.dart          Saved books list (SQLite)
@@ -75,3 +88,5 @@ lib/
 - Only Android builds are produced by the automatic build.
 - Speech quality and available voices depend on your phone's text-to-speech engine.
 - Sentence splitting is rule-based, so unusual abbreviations may split in the wrong place.
+- PDF text is joined back into paragraphs by a simple rule, so columns, headers
+  and footnotes may sound out of order in some PDFs.
