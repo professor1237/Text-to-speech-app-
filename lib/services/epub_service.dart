@@ -38,9 +38,22 @@ class EpubService {
     return BookContent(
       book.Title ?? 'Untitled',
       book.Author ?? 'Unknown',
-      book.CoverImage?.Content,
+      _extractCover(book),
       chapters,
     );
+  }
+
+  static Uint8List? _extractCover(epub.EpubBook book) {
+    try {
+      final dynamic img = book.CoverImage;
+      if (img == null) return null;
+      final dynamic content = img.Content;
+      if (content is Uint8List) return content;
+      if (content is List<int>) return Uint8List.fromList(content);
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   static const _blockTags = {
