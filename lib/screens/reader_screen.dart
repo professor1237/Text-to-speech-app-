@@ -8,6 +8,7 @@ import '../models/sentence.dart';
 import '../models/term_rule.dart';
 import '../services/epub_service.dart';
 import '../services/settings_service.dart';
+import '../services/floating_window_service.dart';
 import '../services/speech_controller.dart';
 import '../widgets/paragraph_view.dart';
 import 'settings_sheet.dart';
@@ -156,12 +157,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ? 'Chapter ${_chapter + 1}'
                 : _book!.chapters[_chapter].title),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: 'Term replacement',
-            onPressed: _openTerms,
-          ),
-        ],
+  IconButton(
+    icon: const Icon(Icons.picture_in_picture_alt),
+    tooltip: 'Floating Player',
+    onPressed: () => FloatingWindowService.showFloatingPlayer(),
+  ),
+  IconButton(
+    icon: const Icon(Icons.tune),
+    tooltip: 'Term replacement',
+    onPressed: _openTerms,
+  ),
+],
       ),
       drawer: _book == null
           ? null
