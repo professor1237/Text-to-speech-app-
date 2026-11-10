@@ -1,9 +1,10 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'services/settings_service.dart';
 import 'screens/library_screen.dart';
-import 'services/audio_handler.dart'; // We'll create this
+import 'services/audio_handler.dart';
 
 late AudioHandler audioHandler;
 
@@ -20,6 +21,7 @@ void main() async {
       androidNotificationOngoing: true,
     ),
   );
+  Permission.notification.request(); // Android 13+ notification permission
   runApp(const T2SApp());
 }
 
