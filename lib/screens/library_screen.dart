@@ -130,6 +130,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
         title: const Text('T2S Reader'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.public),
+            tooltip: 'Browser',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BrowserScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.palette),
             tooltip: 'Appearance',
             onPressed: () => showModalBottomSheet(
