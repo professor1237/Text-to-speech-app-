@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../models/sentence.dart';
 import '../models/term_rule.dart';
+import 'voice_service.dart';
 
 class SentenceRef {
   final int chapter;
@@ -43,7 +44,7 @@ class SpeechController extends ChangeNotifier {
     if (_ready) return;
     await tts.awaitSpeakCompletion(true);
     await tts.setSpeechRate(_rate);
-    await tts.setPitch(1.0);
+    await VoiceService.applySaved(tts); // saved pitch, voice and engine
     _ready = true;
   }
 
@@ -58,6 +59,34 @@ class SpeechController extends ChangeNotifier {
   Future<void> setRate(double rate) async {
     _rate = rate.clamp(0.1, 2.0);
     await tts.setSpeechRate(_rate);
+  }
+
+  Future<void> setPitch(double pitch) async {
+    final v = pitch.clamp(0.5, 2.0);
+    await VoiceService.savePitch(v);
+    try {
+      await tts.setPitch(v);
+    } catch (_) {}
+  }
+
+  /// Switch speech engine. Stops speaking; the next Play uses the new engine.
+  Future<void> changeEngine(String? engine) async {
+    await stop();
+    await VoiceService.saveEngine(engine);
+    try {
+      if (engine != null) await tts.setEngine(engine);
+      await tts.setSpeechRate(_rate); // a new engine starts with defaults
+      await tts.setPitch(await VoiceService.savedPitch());
+    } catch (_) {}
+  }
+
+  Future<void> changeVoice(VoiceInfo? voice) async {
+    await VoiceService.saveVoice(voice);
+    try {
+      if (voice != null) {
+        await tts.setVoice({'name': voice.name, 'locale': voice.locale});
+      }
+    } catch (_) {}
   }
 
   Future<void> speak(
