@@ -189,9 +189,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
       }
     });
   }
+  static bool _askedPermissions = false;
 
+  Future<void> _askBackgroundPermissions() async {
+    if (_askedPermissions) return;
+    _askedPermissions = true;
+    if (!await Permission.notification.isGranted) {
+      await Permission.notification.request();
+    }
+    if (!await Permission.ignoreBatteryOptimizations.isGranted) {
+      await Permission.ignoreBatteryOptimizations.request();
+    }
+  }
   void _playFrom(int index) {
     if (_book == null || _queue.isEmpty) return;
+        _askBackgroundPermissions();
     if (index < 0 || index >= _queue.length) index = 0;
     _startIndex = index;
     _updateMediaItem(_queue[index].chapter);
