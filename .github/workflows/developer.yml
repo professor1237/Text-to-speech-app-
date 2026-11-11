@@ -51,14 +51,28 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # 6. Build ARM64 APK
+      # 6. Prepare your permanent signing key
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KS_PASS" ]; then
+            echo "Signing secrets are missing. Add KEYSTORE_BASE64 and KEYSTORE_PASSWORD."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$KS_PASS" >> "$GITHUB_ENV"
+
+      # 7. Build ARM64 APK
       - name: Build Release APK
         run: |
           flutter build apk \
             --release \
             --target-platform android-arm64
 
-      # 7. Verify APK
+      # 8. Verify APK
       - name: Verify APK
         run: |
           APK="build/app/outputs/flutter-apk/app-release.apk"
@@ -71,13 +85,13 @@ jobs:
           echo "APK successfully generated:"
           ls -lh "$APK"
 
-      # 8. Update Developer tag
+      # 9. Update Developer tag
       - name: Update Developer Tag
         run: |
           git tag -f developer "$GITHUB_SHA"
           git push --force origin refs/tags/developer
 
-      # 9. Publish Developer Release
+      # 10. Publish Developer Release
       - name: Update Developer Release
         uses: softprops/action-gh-release@v2
         with:
@@ -98,8 +112,3 @@ jobs:
 
           overwrite_files: true
           fail_on_unmatched_files: true
-          prerelease: true
-          make_latest: false
-
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
