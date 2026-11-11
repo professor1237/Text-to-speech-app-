@@ -15,8 +15,10 @@ import '../services/epub_service.dart';
 import '../services/settings_service.dart';
 import '../services/speech_controller.dart';
 import '../widgets/paragraph_view.dart';
+import 'search_dialog.dart';
 import 'settings_sheet.dart';
 import 'terms_screen.dart';
+import 'voice_sheet.dart';
 
 /// What the background worker needs.
 class _LoadRequest {
@@ -256,6 +258,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (mounted) setState(() => _rules = rules);
   }
 
+  Future<void> _openSearch() async {
+    if (_book == null || _queue.isEmpty) return;
+    final i = await showDialog<int>(
+      context: context,
+      builder: (_) => SearchDialog(queue: _queue, chapterTitle: _chapterTitle),
+    );
+    if (i == null || i < 0 || i >= _queue.length || !mounted) return;
+    _speech.stop();
+    final target = _queue[i];
+    setState(() {
+      _chapter = target.chapter;
+      _startIndex = i;
+      _lastChapter = -1;
+      _lastBlock = -1;
+    });
+    _savePosition();
+    _scrollToBlock(target.block, 3);
+  }
+
   // ---------- UI ----------
 
   TextStyle _styleFor(BlockType t) {
@@ -280,6 +301,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
       appBar: AppBar(
         title: Text(_book == null ? widget.title : _chapterTitle(_chapter)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Search in book',
+            onPressed: _openSearch,
+          ),
+          IconButton(
+            icon: const Icon(Icons.record_voice_over),
+            tooltip: 'Voice and sleep timer',
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => const VoiceSheet(),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: 'Term replacement',

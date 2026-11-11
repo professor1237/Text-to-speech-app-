@@ -42,6 +42,16 @@ Scanned PDFs (pictures of pages) and password-protected files cannot be read.
 - Several accent colours
 - Adjustable text size
 
+## Added features
+
+- **Browser** (globe icon): search or open any site, read the page aloud with
+  sentence highlighting, auto-read, Android back button goes back a page,
+  "Save to library" in the menu to keep a page for later.
+- **Type & Speak** (keyboard icon): type or paste text, or "Paste & speak".
+- **Voice and sleep timer** (voice icon): pitch, speech engine, voice, and a
+  timer that pauses reading after 10 to 60 minutes.
+- **Search in book** (magnifier in the reader): lists every match, tap to jump.
+
 ## Download (Android)
 
 1. Open this repository on GitHub and tap **Releases**.

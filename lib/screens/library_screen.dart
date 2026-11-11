@@ -14,6 +14,8 @@ import '../services/speech_controller.dart';
 import 'browser_screen.dart';
 import 'reader_screen.dart';
 import 'settings_sheet.dart';
+import 'type_speak_screen.dart';
+import 'voice_sheet.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -135,6 +137,23 @@ class _LibraryScreenState extends State<LibraryScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const BrowserScreen()),
+            ).then((_) => _refresh()), // pages saved from the browser
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard),
+            tooltip: 'Type & Speak',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TypeSpeakScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.record_voice_over),
+            tooltip: 'Voice and sleep timer',
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => const VoiceSheet(),
             ),
           ),
           IconButton(

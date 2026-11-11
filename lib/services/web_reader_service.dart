@@ -4,27 +4,37 @@ import 'speech_controller.dart';
 /// Turns a loaded web page into a queue the SpeechController can speak.
 class WebReaderService {
   /// Runs in the page. Collects the paragraph-like text of the article /
-  /// body, drops duplicates and tiny nodes, returns '\n\n'-separated text.
-  static const String extractScript = '''
+  /// body. It skips menus, footers, forms and hidden elements, and never
+  /// reads the same text twice (a <li> that wraps a <p> is read once).
+  /// Returns paragraphs separated by a blank line.
+  static const String extractScript = r'''
     (function() {
       try {
         var root = document.querySelector('article, main, [role=main]') || document.body;
         if (!root) return '';
-        var nodes = root.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
+        var sel = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre';
+        var skip = 'nav, footer, aside, form, script, style, noscript, ' +
+                   '[aria-hidden=true], [role=navigation], [role=contentinfo]';
+        var nodes = root.querySelectorAll(sel);
         var out = [];
         var seen = {};
-        nodes.forEach(function(n) {
-          var t = (n.innerText || '').replace(/\\s+/g, ' ').trim();
-          if (t.length < 2) return;
-          if (seen[t]) return;
+        for (var i = 0; i < nodes.length; i++) {
+          var n = nodes[i];
+          var s = n.closest(skip);
+          if (s && s !== root && root.contains(s)) continue;
+          if (n.querySelector(sel)) continue;
+          var st = window.getComputedStyle(n);
+          if (st.display === 'none' || st.visibility === 'hidden') continue;
+          var t = (n.innerText || '').replace(/\s+/g, ' ').trim();
+          if (t.length < 2 || seen[t]) continue;
           seen[t] = true;
           out.push(t);
-        });
-        if (out.length === 0) {
-          var t = (root.innerText || '').trim();
-          if (t) out.push(t);
         }
-        return out.join('\\n\\n');
+        if (out.length === 0) {
+          var all = (root.innerText || '').trim();
+          if (all) out.push(all);
+        }
+        return out.join('\n\n');
       } catch (e) { return ''; }
     })();
   ''';
