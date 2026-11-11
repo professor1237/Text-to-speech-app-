@@ -7,9 +7,9 @@ environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
- webview_flutter: ^4.7.0
   flutter:
     sdk: flutter
+  webview_flutter: ^4.7.0
   flutter_tts: ^4.2.0
   epubx: ^4.0.0
   html: ^0.15.4
