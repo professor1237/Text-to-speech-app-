@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/book_parser.dart';
 import '../services/library_db.dart';
 import '../services/speech_controller.dart';
+import 'browser_screen.dart';
 import 'reader_screen.dart';
 import 'settings_sheet.dart';
 
@@ -128,6 +129,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
       appBar: AppBar(
         title: const Text('T2S Reader'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.public),
+            tooltip: 'Browser',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BrowserScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.palette),
             tooltip: 'Appearance',
