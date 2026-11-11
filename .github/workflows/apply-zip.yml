@@ -1,0 +1,97 @@
+name: Apply uploaded zip (one-time)
+
+# Put this file at .github/workflows/apply-zip.yml on the Update branch.
+# Then upload a .zip file to the ROOT of the Update branch.
+# The workflow unpacks it over the project, deletes the zip and commits.
+# Delete this workflow file before you merge Update into main.
+
+on:
+  push:
+    branches:
+      - Update
+    paths:
+      - '*.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-zip
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Unpack zip into branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find the zip
+        id: find
+        run: |
+          ZIP="$(ls -t ./*.zip 2>/dev/null | head -n 1 || true)"
+          if [ -z "$ZIP" ]; then
+            echo "No .zip file in the repository root. Nothing to do."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Using $ZIP"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Unpack
+        if: steps.find.outputs.found == 'true'
+        run: |
+          rm -rf "$RUNNER_TEMP/unz"
+          mkdir -p "$RUNNER_TEMP/unz"
+          unzip -q "${{ steps.find.outputs.zip }}" -d "$RUNNER_TEMP/unz"
+          rm -rf "$RUNNER_TEMP/unz/__MACOSX"
+
+          # If everything sits inside one folder, step into it.
+          SRC="$RUNNER_TEMP/unz"
+          if [ ! -f "$SRC/pubspec.yaml" ]; then
+            COUNT="$(find "$SRC" -mindepth 1 -maxdepth 1 | wc -l)"
+            ONLY="$(find "$SRC" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+            if [ "$COUNT" -eq 1 ] && [ -f "$ONLY/pubspec.yaml" ]; then
+              SRC="$ONLY"
+            fi
+          fi
+          if [ ! -f "$SRC/pubspec.yaml" ]; then
+            echo "pubspec.yaml not found in the zip. Stopping so nothing is damaged."
+            exit 1
+          fi
+          echo "SRC=$SRC" >> "$GITHUB_ENV"
+
+      - name: Copy files over the project
+        if: steps.find.outputs.found == 'true'
+        run: |
+          # No --delete: files that are not in the zip (app icons, etc.) stay.
+          # .github is skipped: a workflow cannot change workflow files.
+          rsync -a \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '*.zip' \
+            "$SRC"/ ./
+
+      - name: Delete the zip
+        if: steps.find.outputs.found == 'true'
+        run: rm -f ./*.zip
+
+      - name: Commit and push
+        if: steps.find.outputs.found == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Apply uploaded zip and remove it"
+          git push origin "HEAD:${{ github.ref_name }}"
