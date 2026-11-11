@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/book_parser.dart';
 import '../services/library_db.dart';
 import '../services/speech_controller.dart';
+import 'browser_screen.dart';
 import 'reader_screen.dart';
 import 'settings_sheet.dart';
 
