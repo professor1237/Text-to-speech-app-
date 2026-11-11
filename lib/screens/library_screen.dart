@@ -6,9 +6,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/book_parser.dart';
 import '../services/library_db.dart';
+import '../services/speech_controller.dart';
 import 'reader_screen.dart';
 import 'settings_sheet.dart';
 
@@ -82,6 +84,44 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
+  /// Asks first, then removes the book, its saved copy and its reading position.
+  Future<void> _confirmDelete(Map<String, dynamic> b) async {
+    final title = (b['title'] as String?) ?? 'Untitled';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove this book?'),
+        content: Text('"$title" will be removed from your library.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final path = b['path'] as String;
+    final speech = SpeechController.instance;
+    if (speech.owner == path) await speech.stop();
+
+    await LibraryDB.delete(b['id'] as int);
+    try {
+      final f = File(path);
+      if (await f.exists()) await f.delete(); // free the storage space
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('pos_$path');
+    } catch (_) {}
+    await _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -141,10 +181,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 ),
                               ),
                             ),
-                            onLongPress: () async {
-                              await LibraryDB.delete(b['id'] as int);
-                              await _refresh();
-                            },
+                            onLongPress: () => _confirmDelete(b),
                           );
                         },
                       ),
