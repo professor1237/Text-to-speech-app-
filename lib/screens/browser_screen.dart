@@ -22,7 +22,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   final _speech = SpeechController.instance;
 
   bool _loading = false;
-  bool _autoRead = false;     // off by default; toggle in AppBar
+  bool _autoRead = false;
   bool _pageReadDone = false;
   bool _pageReady = false;
   String? _currentUrl;
@@ -69,7 +69,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _speech.setRules(_rules);
   }
 
-  // Highlight the current sentence in the page with the Selection API.
   void _onSpeechChanged() {
     if (!mounted) return;
     final cur = _speech.current;
@@ -102,8 +101,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
     try { await _controller.runJavaScript(js); } catch (_) {}
   }
 
-  // webview_flutter returns the JS result JSON-encoded on Android but
-  // already decoded on iOS — this handles both.
   String _extractString(Object raw) {
     if (raw is String) {
       try {
@@ -161,7 +158,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (q.contains('://')) {
       uri = Uri.tryParse(q);
     } else if (q.contains('.') && !q.contains(' ')) {
-      uri = Uri.tryParse('https://$q');   // bare domain
+      uri = Uri.tryParse('https://$q');
     }
     if (uri == null || uri.host.isEmpty) {
       uri = Uri.parse('https://duckduckgo.com/?q=${Uri.encodeComponent(q)}');
@@ -203,7 +200,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(_autoRead ? Icons.headphones : Icons.headphones_off),
+            icon: Icon(_autoRead ? Icons.volume_up : Icons.volume_off),
             tooltip: _autoRead ? 'Auto-read: ON' : 'Auto-read: OFF',
             onPressed: () => setState(() => _autoRead = !_autoRead),
           ),
@@ -255,7 +252,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                       if (active) {
                         playing ? _speech.pause() : _speech.resume();
                       } else {
-                        _readPage();     // "tap play" -> reads the page
+                        _readPage();
                       }
                     },
                   ),
