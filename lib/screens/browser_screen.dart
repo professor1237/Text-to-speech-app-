@@ -446,6 +446,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
           ),
           actions: [
             IconButton(
+              icon: const Icon(Icons.library_books_outlined),
+              tooltip: 'Return to library',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            IconButton(
               icon: Icon(_autoRead ? Icons.volume_up : Icons.volume_off),
               tooltip: _autoRead ? 'Auto-read: ON' : 'Auto-read: OFF',
               onPressed: () => setState(() => _autoRead = !_autoRead),
