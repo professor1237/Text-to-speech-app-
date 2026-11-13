@@ -5,6 +5,8 @@ class SettingsService {
   static final themeMode = ValueNotifier<ThemeMode>(ThemeMode.system);
   static final fontScale = ValueNotifier<double>(1.0);
   static final seedColor = ValueNotifier<Color>(Colors.indigo);
+  static final readerTextColor = ValueNotifier<Color>(const Color(0xFF212121));
+  static final readerBackgroundColor = ValueNotifier<Color>(Colors.white);
 
   static const seedChoices = <String, Color>{
     'Indigo': Colors.indigo,
@@ -15,6 +17,25 @@ class SettingsService {
     'Blue': Colors.blue,
     'Pink': Colors.pink,
     'Red': Colors.red,
+  };
+
+  static const readerTextChoices = <String, Color>{
+    'Dark': Color(0xFF212121),
+    'Black': Colors.black,
+    'Grey': Color(0xFF616161),
+    'White': Colors.white,
+    'Cream': Color(0xFF5D4037),
+    'Navy': Color(0xFF102A43),
+  };
+
+  static const readerBackgroundChoices = <String, Color>{
+    'White': Colors.white,
+    'Warm': Color(0xFFFFF8E7),
+    'Sepia': Color(0xFFF1E3C8),
+    'Light grey': Color(0xFFF1F3F5),
+    'Dark': Color(0xFF171717),
+    'Black': Colors.black,
+    'Navy': Color(0xFF102A43),
   };
 
   static Future<void> load() async {
@@ -28,6 +49,10 @@ class SettingsService {
     fontScale.value = prefs.getDouble('font_scale') ?? 1.0;
     final name = prefs.getString('seed_color') ?? 'Indigo';
     seedColor.value = seedChoices[name] ?? Colors.indigo;
+    readerTextColor.value =
+        Color(prefs.getInt('reader_text_color') ?? 0xFF212121);
+    readerBackgroundColor.value =
+        Color(prefs.getInt('reader_background_color') ?? 0xFFFFFFFF);
   }
 
   static Future<void> setThemeMode(ThemeMode m) async {
@@ -41,7 +66,7 @@ class SettingsService {
   }
 
   static Future<void> setFontScale(double s) async {
-    final v = s.clamp(0.7, 2.0);
+    final v = s.clamp(0.7, 2.0).toDouble();
     fontScale.value = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('font_scale', v);
@@ -51,5 +76,17 @@ class SettingsService {
     seedColor.value = seedChoices[name] ?? Colors.indigo;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('seed_color', name);
+  }
+
+  static Future<void> setReaderTextColor(Color color) async {
+    readerTextColor.value = color;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('reader_text_color', color.toARGB32());
+  }
+
+  static Future<void> setReaderBackgroundColor(Color color) async {
+    readerBackgroundColor.value = color;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('reader_background_color', color.toARGB32());
   }
 }
