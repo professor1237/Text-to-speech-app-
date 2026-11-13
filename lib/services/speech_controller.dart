@@ -79,15 +79,21 @@ class SpeechController extends ChangeNotifier {
 
   Future<void> _configureAudioSession() async {
     if (_audioSessionConfigured) return;
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.speech());
-    session.interruptionEventStream.listen((event) {
-      if (event.begin && isPlaying) pause();
-    });
-    session.becomingNoisyEventStream.listen((_) {
-      if (isPlaying) pause();
-    });
-    _audioSessionConfigured = true;
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.speech());
+      session.interruptionEventStream.listen((event) {
+        if (event.begin && isPlaying) pause();
+      });
+      session.becomingNoisyEventStream.listen((_) {
+        if (isPlaying) pause();
+      });
+      _audioSessionConfigured = true;
+    } catch (e) {
+      // Audio focus is best-effort; a platform-specific session failure must
+      // not prevent the text-to-speech engine from initializing.
+      debugPrint('Could not configure audio session: $e');
+    }
   }
 
   Future<void> _activateAudioSession() async {
