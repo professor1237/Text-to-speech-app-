@@ -1,7 +1,8 @@
-# TTS Reader
+# Tts
 
-A text-to-speech reader for Android. Import a book or document, press play, and
-listen while the app highlights each sentence and scrolls along with the voice.
+A text-to-speech reader for Android. Import a book or document, press play, and listen while the app highlights each sentence and scrolls along with the voice.
+
+The name on the phone is **Tts**.
 
 ## Supported files
 
@@ -42,14 +43,11 @@ Scanned PDFs (pictures of pages) and password-protected files cannot be read.
 - Several accent colours
 - Adjustable text size
 
-## Added features
+## Extra screens
 
-- **Browser** (globe icon): search or open any site, read the page aloud with
-  sentence highlighting, auto-read, Android back button goes back a page,
-  "Save to library" in the menu to keep a page for later.
+- **Browser** (globe icon): search or open any site, read the page aloud with sentence highlighting, auto-read, Android back button goes back a page, and "Save to library" keeps a page for later. Double-tap text on the page to start speaking from that sentence.
 - **Type & Speak** (keyboard icon): type or paste text, or "Paste & speak".
-- **Voice and sleep timer** (voice icon): pitch, speech engine, voice, and a
-  timer that pauses reading after 10 to 60 minutes.
+- **Voice and sleep timer** (voice icon): pitch, speech engine, voice, and a timer that pauses reading after 10 to 60 minutes.
 - **Search in book** (magnifier in the reader): lists every match, tap to jump.
 
 ## Download (Android)
@@ -58,14 +56,20 @@ Scanned PDFs (pictures of pages) and password-protected files cannot be read.
 2. Open **Developer Build**.
 3. Download `app-release.apk` and install it.
 
-The APK is built automatically by GitHub Actions every time code is pushed
-to the `main` branch.
+The APK is built automatically by GitHub Actions every time code is pushed to the `main` branch.
 
 ## Build it yourself
 
 ```bash
+git pull
 flutter pub get
 flutter run
+```
+
+Release APK:
+
+```bash
+flutter build apk --release --target-platform android-arm64
 ```
 
 ## Project layout
@@ -84,11 +88,18 @@ lib/
     audio_handler.dart       Notification and headphone buttons
     library_db.dart          Saved books list (SQLite)
     settings_service.dart    Theme, accent colour, text size
+    web_reader_service.dart  Reads a web page into sentences
+    voice_service.dart       Pitch, engine, and voice
+    sleep_timer.dart         Pauses reading after a set time
   screens/
     library_screen.dart      Book list and import
     reader_screen.dart       Reading page and player controls
+    browser_screen.dart      In-app browser reader
+    type_speak_screen.dart   Type or paste text and speak it
     terms_screen.dart        Term replacement editor
     settings_sheet.dart      Appearance settings
+    voice_sheet.dart         Voice and sleep timer
+    search_dialog.dart       Search inside a book
   widgets/
     paragraph_view.dart      Double-tap and sentence highlight
 ```
@@ -98,5 +109,5 @@ lib/
 - Only Android builds are produced by the automatic build.
 - Speech quality and available voices depend on your phone's text-to-speech engine.
 - Sentence splitting is rule-based, so unusual abbreviations may split in the wrong place.
-- PDF text is joined back into paragraphs by a simple rule, so columns, headers
-  and footnotes may sound out of order in some PDFs.
+- PDF text is joined back into paragraphs by a simple rule, so columns, headers and footnotes may sound out of order in some PDFs.
+- The internal package id stays `com.example.t2s_reader` so existing installs can update. The visible name is **Tts**.
