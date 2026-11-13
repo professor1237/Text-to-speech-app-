@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.t2s_reader"
+    namespace = "com.example.tts_reader"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.t2s_reader"
+        applicationId = "com.example.tts_reader"
         minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

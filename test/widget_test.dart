@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:t2s_reader/models/sentence.dart';
-import 'package:t2s_reader/models/term_rule.dart';
-import 'package:t2s_reader/services/book_parser.dart';
+import 'package:tts_reader/models/sentence.dart';
+import 'package:tts_reader/models/term_rule.dart';
+import 'package:tts_reader/services/book_parser.dart';
 
 void main() {
   group('splitSentences', () {

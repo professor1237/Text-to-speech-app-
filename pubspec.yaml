@@ -1,4 +1,4 @@
-name: t2s_reader
+name: tts_reader
 description: Text-to-speech reader for EPUB, PDF, TXT, DOCX, HTML and Markdown with system voice, term replacement, scroll reading.
 publish_to: 'none'
 version: 1.0.0+1

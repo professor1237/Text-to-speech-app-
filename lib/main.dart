@@ -16,7 +16,7 @@ void main() async {
   audioHandler = await AudioService.init(
     builder: () => TtsAudioHandler(),
     config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.example.t2s_reader.audio',
+      androidNotificationChannelId: 'com.example.tts_reader.audio',
       androidNotificationChannelName: 'Tts Playback',
       androidNotificationOngoing: true,
     ),

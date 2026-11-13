@@ -119,4 +119,4 @@ test/
 - Speech quality and available voices depend on the text-to-speech engines installed on the device.
 - Sentence splitting uses rules; unusual abbreviations or punctuation may be handled imperfectly.
 - PDF text is reconstructed into paragraphs using heuristics. Multi-column layouts, headers, footnotes, and complex page designs may be read out of order.
-- The Android application/package identifier is currently `com.example.t2s_reader`; the app's displayed name is **Tts**.
+- The Android application ID is `com.example.tts_reader`, and the iOS bundle identifier is `com.example.ttsReader`. The app's displayed name is **Tts**.

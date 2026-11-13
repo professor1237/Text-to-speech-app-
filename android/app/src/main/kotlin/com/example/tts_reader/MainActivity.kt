@@ -1,4 +1,4 @@
-package com.example.t2s_reader
+package com.example.tts_reader
 
 import com.ryanheise.audioservice.AudioServiceActivity
 
