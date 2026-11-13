@@ -15,7 +15,6 @@ import 'browser_screen.dart';
 import 'reader_screen.dart';
 import 'settings_sheet.dart';
 import 'type_speak_screen.dart';
-import 'voice_sheet.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -172,17 +171,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.record_voice_over),
-            tooltip: 'Voice and sleep timer',
-            onPressed: () => showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              builder: (_) => const VoiceSheet(),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.palette),
-            tooltip: 'Appearance',
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
             onPressed: () => showModalBottomSheet(
               context: context,
               isScrollControlled: true,
