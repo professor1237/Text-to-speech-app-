@@ -82,7 +82,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _speech.addListener(_onSpeechChanged);
     SettingsService.fontScale.addListener(_onSettingsChanged);
     SettingsService.readerTextColor.addListener(_onSettingsChanged);
-    SettingsService.readerBackgroundColor.addListener(_onSettingsChanged);
     _load();
   }
 
@@ -91,7 +90,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _speech.removeListener(_onSpeechChanged);
     SettingsService.fontScale.removeListener(_onSettingsChanged);
     SettingsService.readerTextColor.removeListener(_onSettingsChanged);
-    SettingsService.readerBackgroundColor.removeListener(_onSettingsChanged);
     super.dispose();
   }
 
@@ -326,7 +324,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final active = _speech.isActive;
     final playing = _speech.isPlaying;
     return Scaffold(
-      backgroundColor: SettingsService.readerBackgroundColor.value,
       appBar: AppBar(
         title: Text(_book == null ? widget.title : _chapterTitle(_chapter)),
         actions: [
