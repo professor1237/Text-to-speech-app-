@@ -19,7 +19,6 @@ class WebReaderService {
         var blockSel = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, td, th, figcaption, dt, dd';
         var nodes = root.querySelectorAll(blockSel);
         var out = [];
-        var seen = {};
 
         function isVisible(el) {
           var st = window.getComputedStyle(el);
@@ -45,9 +44,8 @@ class WebReaderService {
           var t = clean(n.innerText);
           if (t.length < 2) continue;
 
-          if (seen[t]) continue;
-          seen[t] = true;
-
+          // Preserve repeated paragraphs; identical text can legitimately
+          // appear more than once in an article or story.
           out.push(t);
         }
 
@@ -93,11 +91,38 @@ class WebReaderService {
         return '';
       }
 
-      document.addEventListener('dblclick', function(e) {
+      function sendText(target) {
         try {
-          var text = nearestText(e.target);
+          var text = nearestText(target);
           if (text && text.length >= 2 && window.TtsReader) {
             window.TtsReader.postMessage(text);
+          }
+        } catch (_) {}
+      }
+
+      document.addEventListener('dblclick', function(e) {
+        sendText(e.target);
+      }, true);
+
+      // WebViews on phones do not consistently emit dblclick. Detect a
+      // deliberate second tap near the first tap as a mobile equivalent.
+      var lastTapAt = 0;
+      var lastTapX = 0;
+      var lastTapY = 0;
+      document.addEventListener('touchend', function(e) {
+        try {
+          if (!e.changedTouches || e.changedTouches.length === 0) return;
+          var touch = e.changedTouches[0];
+          var now = Date.now();
+          var close = Math.abs(touch.clientX - lastTapX) < 28 &&
+                      Math.abs(touch.clientY - lastTapY) < 28;
+          if (now - lastTapAt < 380 && close) {
+            sendText(e.target);
+            lastTapAt = 0;
+          } else {
+            lastTapAt = now;
+            lastTapX = touch.clientX;
+            lastTapY = touch.clientY;
           }
         } catch (_) {}
       }, true);
