@@ -279,8 +279,11 @@ class SpeechController extends ChangeNotifier {
       _index++;
     }
     if (gen == _generation) {
+      // Persist an end-of-book marker. ReaderScreen clamps it to the start
+      // when the book is opened again.
+      _index = _queue.length;
+      await _savePosition();
       _index = -1;
-      _savePosition();
       _setState(SpeechState.stopped);
       await _deactivateAudioSession();
     }
