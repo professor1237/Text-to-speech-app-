@@ -4,6 +4,22 @@ import 'speech_controller.dart';
 class TtsAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   TtsAudioHandler() {
     SpeechController.instance.onStateChanged = _sync;
+    SpeechController.instance.onCurrentChanged = _syncCurrent;
+  }
+
+  void _syncCurrent(SentenceRef? current) {
+    if (current == null) return;
+    final speech = SpeechController.instance;
+    final chapter = current.chapter;
+    final chapterTitle = chapter >= 0 && chapter < speech.chapterTitles.length
+        ? speech.chapterTitles[chapter]
+        : 'Reading';
+    mediaItem.add(MediaItem(
+      id: speech.owner ?? 'tts_reader',
+      album: speech.mediaAuthor,
+      title: speech.mediaTitle ?? 'Text to speech',
+      artist: chapterTitle.isEmpty ? 'Reading' : chapterTitle,
+    ));
   }
 
   void _sync(SpeechState s) {
