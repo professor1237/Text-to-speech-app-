@@ -415,7 +415,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           (document.head || document.documentElement).appendChild(style);
         }
         style.textContent =
-          'html, body { background: $backgroundColor !important; }' +
+          'html, body, body * { background-color: $backgroundColor !important; }' +
           'body, body * { color: $textColor !important; }';
       })();
     ''';
