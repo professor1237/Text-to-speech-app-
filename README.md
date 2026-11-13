@@ -1,6 +1,6 @@
-# Tts
+# Text-to-Speech Ebook Reader
 
-**Tts** is an Android text-to-speech reader for ebooks, documents, and web pages. Open a book, choose a sentence, and listen while the app highlights the text and follows along.
+An Android app that reads ebooks, documents, and web pages aloud, with sentence highlighting and playback controls.
 
 ## Supported formats
 
