@@ -28,6 +28,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   List<Map<String, dynamic>> _books = [];
   bool _loading = true;
   bool _importing = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -36,12 +37,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _refresh() async {
-    final books = await LibraryDB.all();
-    if (!mounted) return;
-    setState(() {
-      _books = books;
-      _loading = false;
+    if (mounted) setState(() {
+      _loading = true;
+      _loadError = null;
     });
+    try {
+      final books = await LibraryDB.all();
+      if (!mounted) return;
+      setState(() {
+        _books = books;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = 'Could not load your library. Please try again. ($e)';
+        _loading = false;
+      });
+    }
   }
 
   void _snack(String message) {
@@ -64,9 +77,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
 
     setState(() => _importing = true);
+    String? dest;
     try {
       final bytes = await File(src).readAsBytes();
-      // Heavy work runs in the background so the app never freezes.
       final book = await compute(
         BookParser.parse,
         BookInput(file.name, bytes, baseName(file.name)),
@@ -75,19 +88,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ? baseName(file.name)
           : book.title;
       final dir = await getApplicationDocumentsDirectory();
-      final dest = p.join(
+      dest = p.join(
           dir.path, 'book_${DateTime.now().millisecondsSinceEpoch}.$ext');
       await File(dest).writeAsBytes(bytes);
       await LibraryDB.insert(dest, title, book.author, book.cover);
       await _refresh();
     } catch (e) {
+      if (dest != null) {
+        try {
+          final saved = File(dest);
+          if (await saved.exists()) await saved.delete();
+        } catch (_) {}
+      }
       _snack('Could not import this file: $e');
     } finally {
       if (mounted) setState(() => _importing = false);
     }
   }
 
-  /// Asks first, then removes the book, its saved copy and its reading position.
   Future<void> _confirmDelete(Map<String, dynamic> b) async {
     final title = (b['title'] as String?) ?? 'Untitled';
     final ok = await showDialog<bool>(
@@ -116,7 +134,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     await LibraryDB.delete(b['id'] as int);
     try {
       final f = File(path);
-      if (await f.exists()) await f.delete(); // free the storage space
+      if (await f.exists()) await f.delete();
     } catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -137,7 +155,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const BrowserScreen()),
-            ).then((_) => _refresh()), // pages saved from the browser
+            ).then((_) => _refresh()),
           ),
           IconButton(
             icon: const Icon(Icons.keyboard),
@@ -173,46 +191,69 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _books.isEmpty
-                    ? const Center(
+                : _loadError != null
+                    ? Center(
                         child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text(
-                            'No books yet.\nTap + to import a file.\n\n'
-                            'EPUB, PDF, TXT, DOCX, HTML, MD',
-                            textAlign: TextAlign.center,
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.error_outline, size: 36),
+                              const SizedBox(height: 12),
+                              Text(_loadError!, textAlign: TextAlign.center),
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                onPressed: _refresh,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
                           ),
                         ),
                       )
-                    : ListView.separated(
-                        itemCount: _books.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (_, i) {
-                          final b = _books[i];
-                          final cover = b['cover'] as Uint8List?;
-                          return ListTile(
-                            leading: SizedBox(
-                              width: 44,
-                              height: 60,
-                              child: cover != null
-                                  ? Image.memory(cover, fit: BoxFit.cover)
-                                  : const Icon(Icons.menu_book),
-                            ),
-                            title: Text(b['title'] ?? 'Untitled'),
-                            subtitle: Text(b['author'] ?? ''),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ReaderScreen(
-                                  filePath: b['path'] as String,
-                                  title: b['title'] as String? ?? 'Untitled',
-                                ),
+                    : _books.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Text(
+                                'No books yet.\nTap + to import a file.\n\n'
+                                'EPUB, PDF, TXT, DOCX, HTML, MD',
+                                textAlign: TextAlign.center,
                               ),
                             ),
-                            onLongPress: () => _confirmDelete(b),
-                          );
-                        },
-                      ),
+                          )
+                        : ListView.separated(
+                            itemCount: _books.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (_, i) {
+                              final b = _books[i];
+                              final cover = b['cover'] as Uint8List?;
+                              return ListTile(
+                                leading: SizedBox(
+                                  width: 44,
+                                  height: 60,
+                                  child: cover != null
+                                      ? Image.memory(cover,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(Icons.menu_book))
+                                      : const Icon(Icons.menu_book),
+                                ),
+                                title: Text(b['title'] ?? 'Untitled'),
+                                subtitle: Text(b['author'] ?? ''),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ReaderScreen(
+                                      filePath: b['path'] as String,
+                                      title: b['title'] as String? ?? 'Untitled',
+                                    ),
+                                  ),
+                                ),
+                                onLongPress: () => _confirmDelete(b),
+                              );
+                            },
+                          ),
           ),
         ],
       ),
