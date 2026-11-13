@@ -100,6 +100,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _load() async {
     try {
+      await _speech.initialize();
+      if (mounted) setState(() => _speed = _speech.rate);
       // Heavy work runs in the background so the app never freezes.
       final loaded = await compute(
         _loadBookInBackground,
@@ -159,7 +161,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final cur = _speech.current;
     if (cur != null && _speech.owner == widget.filePath) {
       _startIndex = _speech.index;
-      _savePosition();
       if (cur.chapter != _chapter) {
         setState(() => _chapter = cur.chapter);
         _updateMediaItem(cur.chapter);
