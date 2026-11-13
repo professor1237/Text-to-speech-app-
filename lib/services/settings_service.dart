@@ -6,6 +6,8 @@ class SettingsService {
   static final fontScale = ValueNotifier<double>(1.0);
   static final seedColor = ValueNotifier<Color>(Colors.indigo);
   static final readerTextColor = ValueNotifier<Color>(const Color(0xFF212121));
+  // Keep the reader's existing page background independent from Settings.
+  static final readerBackgroundColor = ValueNotifier<Color>(Colors.white);
   static final settingsPanelBackgroundColor = ValueNotifier<Color>(Colors.white);
 
   static const seedChoices = <String, Color>{
@@ -25,6 +27,16 @@ class SettingsService {
     'Grey': Color(0xFF616161),
     'White': Colors.white,
     'Cream': Color(0xFF5D4037),
+    'Navy': Color(0xFF102A43),
+  };
+
+  static const readerBackgroundChoices = <String, Color>{
+    'White': Colors.white,
+    'Warm': Color(0xFFFFF8E7),
+    'Sepia': Color(0xFFF1E3C8),
+    'Light grey': Color(0xFFF1F3F5),
+    'Dark': Color(0xFF171717),
+    'Black': Colors.black,
     'Navy': Color(0xFF102A43),
   };
 
@@ -51,8 +63,10 @@ class SettingsService {
     seedColor.value = seedChoices[name] ?? Colors.indigo;
     readerTextColor.value =
         Color(prefs.getInt('reader_text_color') ?? 0xFF212121);
-    settingsPanelBackgroundColor.value =
+    readerBackgroundColor.value =
         Color(prefs.getInt('reader_background_color') ?? 0xFFFFFFFF);
+    settingsPanelBackgroundColor.value =
+        Color(prefs.getInt('settings_panel_background_color') ?? 0xFFFFFFFF);
   }
 
   static Future<void> setThemeMode(ThemeMode m) async {
@@ -87,6 +101,6 @@ class SettingsService {
   static Future<void> setSettingsPanelBackgroundColor(Color color) async {
     settingsPanelBackgroundColor.value = color;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('reader_background_color', color.toARGB32());
+    await prefs.setInt('settings_panel_background_color', color.toARGB32());
   }
 }
