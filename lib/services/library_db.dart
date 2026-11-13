@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -37,12 +38,40 @@ class LibraryDB {
     );
   }
 
+  static Future<Uint8List?> _prepareCover(Uint8List? cover) async {
+    if (cover == null || cover.isEmpty) return null;
+    ui.Codec? codec;
+    ui.Image? image;
+    try {
+      codec = await ui.instantiateImageCodec(
+        cover,
+        targetWidth: 256,
+        targetHeight: 384,
+      );
+      final frame = await codec.getNextFrame();
+      image = frame.image;
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) return null;
+      return data.buffer.asUint8List(
+        data.offsetInBytes,
+        data.lengthInBytes,
+      );
+    } catch (_) {
+      // If decoding fails, only retain a small original image.
+      return cover.length <= _maxStoredCoverBytes ? cover : null;
+    } finally {
+      image?.dispose();
+      codec?.dispose();
+    }
+  }
+
   static Future<void> insert(
       String path, String title, String author, Uint8List? cover) async {
     final db = await _open();
+    final safeCover = await _prepareCover(cover);
     await db.insert(
       'books',
-      {'path': path, 'title': title, 'author': author, 'cover': cover != null && cover.length <= _maxStoredCoverBytes ? cover : null},
+      {'path': path, 'title': title, 'author': author, 'cover': safeCover},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
