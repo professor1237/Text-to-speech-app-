@@ -123,6 +123,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (start < 0 || start >= queue.length) start = 0;
 
       _speech.setRules(rules);
+      _speech.setBookMetadata(
+        book.title,
+        book.author,
+        book.chapters.map((chapter) => chapter.title).toList(),
+      );
       if (!mounted) return;
       setState(() {
         _book = book;
