@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../models/block.dart';
+import '../services/settings_service.dart';
 
 class ParagraphView extends StatefulWidget {
   final Block block;
@@ -28,8 +29,7 @@ class _ParagraphViewState extends State<ParagraphView> {
   @override
   Widget build(BuildContext context) {
     final effectiveStyle = widget.style.copyWith(
-      color: widget.style.color ??
-          Theme.of(context).colorScheme.onSurface,
+      color: SettingsService.readerTextColor.value,
     );
 
     return GestureDetector(
