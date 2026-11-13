@@ -81,7 +81,7 @@ class SettingsService {
   static Future<void> setReaderTextColor(Color color) async {
     readerTextColor.value = color;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('reader_text_color', color.toARGB32());
+    await prefs.setInt('reader_text_color', color.value);
   }
 
   static Future<void> setReaderBackgroundColor(Color color) async {
