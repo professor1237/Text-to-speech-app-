@@ -42,6 +42,7 @@ class SpeechController extends ChangeNotifier {
 
   /// Reports a sentence-level playback error instead of silently skipping it.
   void Function(String message)? onPlaybackError;
+  String? lastError;
 
   int get index => _index;
   double get rate => _rate;
@@ -158,6 +159,12 @@ class SpeechController extends ChangeNotifier {
     }
   }
 
+  void _reportPlaybackError(String message) {
+    lastError = message;
+    onPlaybackError?.call(message);
+    notifyListeners();
+  }
+
   Future<void> speak(
     List<SentenceRef> queue,
     int start,
@@ -170,7 +177,7 @@ class SpeechController extends ChangeNotifier {
     } catch (e) {
       if (gen == _generation) {
         _index = -1;
-        onPlaybackError?.call('Speech engine could not initialize: $e');
+        _reportPlaybackError('Speech engine could not initialize: $e');
         _setState(SpeechState.stopped);
       }
       return;
@@ -187,6 +194,7 @@ class SpeechController extends ChangeNotifier {
       return;
     }
 
+    lastError = null;
     await _activateAudioSession();
     _queue = queue;
     _rules = rules;
@@ -222,6 +230,7 @@ class SpeechController extends ChangeNotifier {
       notifyListeners();
       await _savePosition();
       final text = applyTermRules(_queue[_index].sentence.text, _rules);
+      var failed = false;
       if (text.trim().isNotEmpty) {
         for (final chunk in _ttsChunks(text)) {
           if (gen != _generation) return;
@@ -229,19 +238,27 @@ class SpeechController extends ChangeNotifier {
             final result = await tts.speak(chunk);
             if (result is int && result != 1 ||
                 result is bool && !result) {
-              onPlaybackError?.call(
+              _reportPlaybackError(
                 'The speech engine rejected a text segment. Try another voice or engine.',
               );
+              failed = true;
               break;
             }
           } catch (e) {
             if (gen != _generation) return;
-            onPlaybackError?.call('Could not speak this text segment: $e');
+            _reportPlaybackError('Could not speak this text segment: $e');
+            failed = true;
             break;
           }
         }
       }
       if (gen != _generation) return;
+      if (failed) {
+        await _savePosition();
+        _setState(SpeechState.stopped);
+        await _deactivateAudioSession();
+        return;
+      }
       _index++;
     }
     if (gen == _generation) {
