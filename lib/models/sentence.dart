@@ -43,7 +43,17 @@ bool _isFalseEnd(String text, int i) {
   // Initials only suppress a boundary when another capitalized name follows.
   final next = _nextNonWhitespace(text, i + 1);
   if (word.length == 1) {
-    return next < text.length && _isUpper(text.codeUnitAt(next));
+    // Keep paired initials such as "J. R. Tolkien", but allow a single
+    // letter at the end of a phrase ("Plan B. Next") to end the sentence.
+    if (next + 2 < text.length &&
+        _isUpper(text.codeUnitAt(next)) &&
+        text[next + 1] == '.' &&
+        _isWhitespace(text.codeUnitAt(next + 2))) {
+      final afterInitial = _nextNonWhitespace(text, next + 2);
+      if (afterInitial < text.length &&
+          _isUpper(text.codeUnitAt(afterInitial))) return true;
+    }
+    return false;
   }
 
   // Titles are abbreviations even before a capitalized name ("Dr. Rao").
