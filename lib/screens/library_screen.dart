@@ -129,7 +129,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('T2S Reader'),
+        title: const Text('Tts'),
         actions: [
           IconButton(
             icon: const Icon(Icons.public),

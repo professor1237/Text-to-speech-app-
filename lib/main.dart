@@ -17,16 +17,16 @@ void main() async {
     builder: () => TtsAudioHandler(),
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.example.t2s_reader.audio',
-      androidNotificationChannelName: 'T2S Reader Playback',
+      androidNotificationChannelName: 'Tts Playback',
       androidNotificationOngoing: true,
     ),
   );
   Permission.notification.request(); // Android 13+ notification permission
-  runApp(const T2SApp());
+  runApp(const TtsApp());
 }
 
-class T2SApp extends StatelessWidget {
-  const T2SApp({super.key});
+class TtsApp extends StatelessWidget {
+  const TtsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +35,7 @@ class T2SApp extends StatelessWidget {
       builder: (_, mode, __) => ValueListenableBuilder<Color>(
         valueListenable: SettingsService.seedColor,
         builder: (context, seed, _) => MaterialApp(
-          title: 'T2S Reader',
+          title: 'Tts',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             colorSchemeSeed: seed,

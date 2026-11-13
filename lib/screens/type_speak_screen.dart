@@ -91,7 +91,7 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
     audioHandler.updateMediaItem(const MediaItem(
       id: _owner,
       title: 'Typed text',
-      artist: 'T2S Reader',
+      artist: 'Tts',
     ));
     _speech.speak(queue, 0, rules, owner: _owner);
   }
