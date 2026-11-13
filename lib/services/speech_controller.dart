@@ -39,6 +39,10 @@ class SpeechController extends ChangeNotifier {
 
   /// Lets the notification (audio_handler) follow our state.
   void Function(SpeechState state)? onStateChanged;
+  void Function(SentenceRef? current)? onCurrentChanged;
+  String? mediaTitle;
+  String mediaAuthor = 'Unknown';
+  List<String> chapterTitles = const [];
 
   /// Reports a sentence-level playback error instead of silently skipping it.
   void Function(String message)? onPlaybackError;
@@ -111,6 +115,12 @@ class SpeechController extends ChangeNotifier {
   }
 
   void setRules(List<TermRule> rules) => _rules = rules;
+
+  void setBookMetadata(String title, String author, List<String> chapters) {
+    mediaTitle = title;
+    mediaAuthor = author;
+    chapterTitles = chapters;
+  }
 
   Future<void> setRate(double rate) async {
     _rate = rate.clamp(0.1, 2.0);
@@ -228,6 +238,7 @@ class SpeechController extends ChangeNotifier {
   Future<void> _run(int gen) async {
     while (gen == _generation && _index >= 0 && _index < _queue.length) {
       notifyListeners();
+      onCurrentChanged?.call(current);
       await _savePosition();
       final text = applyTermRules(_queue[_index].sentence.text, _rules);
       var failed = false;
