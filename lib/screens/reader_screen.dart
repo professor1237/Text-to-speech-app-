@@ -72,6 +72,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   int _lastBlock = -1;
   String? _error;
   double _speed = 0.5;
+  String? _lastShownSpeechError;
 
   String get _posKey => 'pos_${widget.filePath}';
 
@@ -158,6 +159,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _onSpeechChanged() {
     if (!mounted || _book == null) return;
+    final error = _speech.lastError;
+    if (error != null && error != _lastShownSpeechError) {
+      _lastShownSpeechError = error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
     final cur = _speech.current;
     if (cur != null && _speech.owner == widget.filePath) {
       _startIndex = _speech.index;
