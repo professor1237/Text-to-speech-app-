@@ -1,111 +1,122 @@
 # Tts
 
-A text-to-speech reader for Android. Import a book or document, press play, and listen while the app highlights each sentence and scrolls along with the voice.
+**Tts** is an Android text-to-speech reader for ebooks, documents, and web pages. Open a book, choose a sentence, and listen while the app highlights the text and follows along.
 
-## Supported files
+## Supported formats
 
-| Type | Notes |
-|------|-------|
-| EPUB | Chapters from the book's table of contents, cover image |
-| PDF | Text PDFs only. Pages are grouped into chapters of 5 pages |
-| TXT | Chapters found from "Chapter 1", "Part II" and similar lines |
-| DOCX | Word documents. Headings become chapters |
+| Format | Support |
+|---|---|
+| EPUB | Chapters from the book's table of contents and cover image |
+| PDF | Text-based PDFs; pages are grouped into chapters of five |
+| TXT | Chapter headings such as "Chapter 1" and "Part II" |
+| DOCX | Word documents; headings become chapters |
 | HTML / HTM | Web pages saved as files |
-| MD | Markdown. Headings become chapters, code blocks are skipped |
+| Markdown (MD) | Headings become chapters; code blocks are skipped |
 
-Scanned PDFs (pictures of pages) and password-protected files cannot be read.
+Scanned/image-only PDFs and password-protected files are not supported.
 
 ## Features
 
-**Reading**
-- Library with cover thumbnails (long-press a book to remove it)
-- Chapter drawer, continuous vertical scrolling
-- Remembers where you stopped in each book
-- Files load in the background, so the app never freezes
+### Reading
+- Import and manage books in a library with cover thumbnails.
+- Read continuously with a chapter drawer and vertical scrolling.
+- Remember the last reading position for each book.
+- Load files in the background to keep the interface responsive.
+- Search within a book and jump to a matching passage.
 
-**Listening**
-- Uses the phone's default text-to-speech voice
-- Play, pause, stop, previous sentence, next sentence
-- Speed slider
-- Double-tap any word to start speaking from that sentence
-- Current sentence is highlighted, and the page follows along automatically
-- Playback controls in the notification and on headphone buttons
+### Text-to-speech
+- Use voices provided by the Android text-to-speech engine.
+- Play, pause, stop, and move between sentences.
+- Adjust speech speed and voice pitch.
+- Double-tap a word or sentence to start reading from that point.
+- Highlight the sentence currently being spoken and scroll along automatically.
+- Control playback from the Android notification and supported headphone buttons.
 
-**Term replacement**
-- Change how words are spoken without changing the text on screen
-- Supports plain text or regular expressions
-- A broken rule is skipped instead of crashing the app
+### Term replacement
+- Customize how words and phrases are pronounced without changing the displayed text.
+- Use plain-text matching or regular expressions.
+- Invalid regular-expression rules are skipped safely.
 
-**Appearance**
-- Light, dark or system theme
-- Several accent colours
-- Adjustable text size
+### Browser and typing
+- Open web pages in the in-app browser and listen with sentence highlighting.
+- Use browser navigation and save supported pages to the library.
+- Paste or type text in **Type & Speak** and listen to it.
 
-## Extra screens
+### Voice, appearance, and sleep timer
+- Configure the available speech voice and engine, and adjust pitch.
+- Choose light, dark, or system theme.
+- Choose an accent colour and adjust reading text size.
+- Set a sleep timer to pause reading after a selected interval.
 
-- **Browser** (globe icon): search or open any site, read the page aloud with sentence highlighting, auto-read, Android back button goes back a page, and "Save to library" keeps a page for later. Double-tap text on the page to start speaking from that sentence.
-- **Type & Speak** (keyboard icon): type or paste text, or "Paste & speak".
-- **Voice and sleep timer** (voice icon): pitch, speech engine, voice, and a timer that pauses reading after 10 to 60 minutes.
-- **Search in book** (magnifier in the reader): lists every match, tap to jump.
+## Download
 
-## Download (Android)
-
-1. Open this repository on GitHub and tap **Releases**.
+1. Open the repository's [Releases](https://github.com/professor1237/Text-to-speech-app-/releases) page.
 2. Open **Developer Build**.
-3. Download `app-release.apk` and install it.
+3. Download `app-release.apk` and install it on your Android device.
 
-The APK is built automatically by GitHub Actions every time code is pushed to the `main` branch.
+The developer APK is built by GitHub Actions when changes are pushed to `main`. The workflow runs the Flutter tests before building the APK. A successful build also requires the Android signing secrets configured for this repository.
 
-## Build it yourself
+## Run locally
+
+You need the Flutter SDK and Android development tools installed.
 
 ```bash
-git pull
+git clone https://github.com/professor1237/Text-to-speech-app-.git
+cd Text-to-speech-app-
 flutter pub get
 flutter run
 ```
 
-Release APK:
+Run the automated tests:
+
+```bash
+flutter test
+```
+
+Build an Android release APK:
 
 ```bash
 flutter build apk --release --target-platform android-arm64
 ```
 
-## Project layout
+## Project structure
 
 ```
 lib/
-  main.dart                  App start, theme, notification setup
+  main.dart                  App entry point and theme setup
   models/
-    block.dart               One paragraph, heading, list item or quote
-    sentence.dart            Splits text into sentences
-    term_rule.dart           Term replacement rules
+    block.dart               Paragraph, heading, list item, or quote
+    sentence.dart            Sentence splitting
+    term_rule.dart           Pronunciation replacement rules
   services/
-    book_parser.dart         Opens PDF, TXT, DOCX, HTML, Markdown
-    epub_service.dart        Opens EPUB
-    speech_controller.dart   Play, pause, skip, sentence queue
-    audio_handler.dart       Notification and headphone buttons
-    library_db.dart          Saved books list (SQLite)
-    settings_service.dart    Theme, accent colour, text size
-    web_reader_service.dart  Reads a web page into sentences
-    voice_service.dart       Pitch, engine, and voice
-    sleep_timer.dart         Pauses reading after a set time
+    book_parser.dart         PDF, TXT, DOCX, HTML, and Markdown parsing
+    epub_service.dart        EPUB parsing
+    speech_controller.dart   Playback queue and speech controls
+    audio_handler.dart       Notification and headphone controls
+    library_db.dart          SQLite library storage
+    settings_service.dart    Theme and reading settings
+    web_reader_service.dart  Web-page text extraction
+    voice_service.dart       Voice, pitch, and engine settings
+    sleep_timer.dart         Timed playback pause
   screens/
-    library_screen.dart      Book list and import
-    reader_screen.dart       Reading page and player controls
+    library_screen.dart      Library and file import
+    reader_screen.dart       Book reading and playback
     browser_screen.dart      In-app browser reader
-    type_speak_screen.dart   Type or paste text and speak it
-    terms_screen.dart        Term replacement editor
+    type_speak_screen.dart   Typed or pasted text reader
+    terms_screen.dart        Pronunciation rule editor
     settings_sheet.dart      Appearance settings
-    voice_sheet.dart         Voice and sleep timer
-    search_dialog.dart       Search inside a book
+    voice_sheet.dart         Voice and sleep timer settings
+    search_dialog.dart       Search within a book
   widgets/
-    paragraph_view.dart      Double-tap and sentence highlight
+    paragraph_view.dart      Sentence highlighting and text interaction
+test/
+  widget_test.dart            Parser and text-processing tests
 ```
 
-## Notes
+## Known limitations
 
-- Only Android builds are produced by the automatic build.
-- Speech quality and available voices depend on your phone's text-to-speech engine.
-- Sentence splitting is rule-based, so unusual abbreviations may split in the wrong place.
-- PDF text is joined back into paragraphs by a simple rule, so columns, headers and footnotes may sound out of order in some PDFs.
-- The internal package id stays `com.example.t2s_reader` so existing installs can update. The visible name is **Tts**.
+- The automatic release workflow currently produces Android APKs only.
+- Speech quality and available voices depend on the text-to-speech engines installed on the device.
+- Sentence splitting uses rules; unusual abbreviations or punctuation may be handled imperfectly.
+- PDF text is reconstructed into paragraphs using heuristics. Multi-column layouts, headers, footnotes, and complex page designs may be read out of order.
+- The Android application/package identifier is currently `com.example.t2s_reader`; the app's displayed name is **Tts**.
