@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sentence.dart';
@@ -28,6 +29,7 @@ class SpeechController extends ChangeNotifier {
   int _index = -1;
   int _generation = 0;
   bool _ready = false;
+  bool _audioSessionConfigured = false;
   Future<void>? _initializing;
   double _rate = 0.5;
   SpeechState _state = SpeechState.stopped;
@@ -58,6 +60,7 @@ class SpeechController extends ChangeNotifier {
 
   Future<void> _initialize() async {
     try {
+      await _configureAudioSession();
       final prefs = await SharedPreferences.getInstance();
       _rate = (prefs.getDouble(_rateKey) ?? 0.5).clamp(0.1, 2.0);
       await tts.awaitSpeakCompletion(true);
@@ -66,6 +69,37 @@ class SpeechController extends ChangeNotifier {
       _ready = true;
     } finally {
       _initializing = null;
+    }
+  }
+
+  Future<void> _configureAudioSession() async {
+    if (_audioSessionConfigured) return;
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.speech());
+    session.interruptionEventStream.listen((event) {
+      if (event.begin && isPlaying) pause();
+    });
+    session.becomingNoisyEventStream.listen((_) {
+      if (isPlaying) pause();
+    });
+    _audioSessionConfigured = true;
+  }
+
+  Future<void> _activateAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (e) {
+      debugPrint('Could not activate audio session: $e');
+    }
+  }
+
+  Future<void> _deactivateAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(false);
+    } catch (e) {
+      debugPrint('Could not deactivate audio session: $e');
     }
   }
 
@@ -153,6 +187,7 @@ class SpeechController extends ChangeNotifier {
       return;
     }
 
+    await _activateAudioSession();
     _queue = queue;
     _rules = rules;
     if (owner != null) this.owner = owner;
@@ -213,6 +248,7 @@ class SpeechController extends ChangeNotifier {
       _index = -1;
       _savePosition();
       _setState(SpeechState.stopped);
+      await _deactivateAudioSession();
     }
   }
 
@@ -224,6 +260,7 @@ class SpeechController extends ChangeNotifier {
     try {
       await tts.stop();
     } catch (_) {}
+    await _deactivateAudioSession();
   }
 
   Future<void> resume() async {
@@ -258,5 +295,6 @@ class SpeechController extends ChangeNotifier {
     } catch (_) {}
     _index = -1;
     _setState(SpeechState.stopped);
+    await _deactivateAudioSession();
   }
 }
