@@ -16,6 +16,43 @@ void main() {
       );
     });
 
+    test('does not split domains or filenames at internal dots', () {
+      final sentences = splitSentences(
+        'Visit example.com and open file.txt. Then continue.',
+      );
+      expect(
+        sentences.map((sentence) => sentence.text.trim()).toList(),
+        ['Visit example.com and open file.txt.', 'Then continue.'],
+      );
+    });
+
+    test('recognizes sentence endings after a single-letter label', () {
+      final sentences = splitSentences('Choose Plan B. Next step.');
+      expect(
+        sentences.map((sentence) => sentence.text.trim()).toList(),
+        ['Choose Plan B.', 'Next step.'],
+      );
+    });
+
+    test('keeps paired initials together', () {
+      final sentences = splitSentences('J. R. Tolkien wrote books. Next.');
+      expect(
+        sentences.map((sentence) => sentence.text.trim()).toList(),
+        ['J. R. Tolkien wrote books.', 'Next.'],
+      );
+    });
+
+    test('recognizes sentence boundaries after etc and no', () {
+      expect(
+        splitSentences('Bring pens, paper, etc. Next item.').map((s) => s.text.trim()).toList(),
+        ['Bring pens, paper, etc.', 'Next item.'],
+      );
+      expect(
+        splitSentences('No. This is separate.').map((s) => s.text.trim()).toList(),
+        ['No.', 'This is separate.'],
+      );
+    });
+
     test('does not create empty sentences for whitespace', () {
       expect(splitSentences('   \n  '), isEmpty);
     });
