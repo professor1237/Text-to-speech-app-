@@ -111,8 +111,12 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
+    return ValueListenableBuilder<Color>(
+      valueListenable: SettingsService.settingsPanelBackgroundColor,
+      builder: (context, panelColor, _) => Material(
+        color: panelColor,
+        child: SafeArea(
+          child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,13 +189,13 @@ class _SettingsSheetState extends State<SettingsSheet> {
                 SettingsService.setReaderTextColor,
               ),
             ),
-            _heading('Reader page background'),
+            _heading('Settings panel background'),
             ValueListenableBuilder<Color>(
-              valueListenable: SettingsService.readerBackgroundColor,
+              valueListenable: SettingsService.settingsPanelBackgroundColor,
               builder: (_, color, __) => _colorChoices(
-                SettingsService.readerBackgroundChoices,
+                SettingsService.settingsPanelBackgroundChoices,
                 color,
-                SettingsService.setReaderBackgroundColor,
+                SettingsService.setSettingsPanelBackgroundColor,
               ),
             ),
             _heading('Reading speed'),
@@ -310,6 +314,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
               ),
             ),
           ],
+        ),
+          ),
         ),
       ),
     );
