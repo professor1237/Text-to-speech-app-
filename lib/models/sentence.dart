@@ -8,54 +8,93 @@ class Sentence {
 const _enders = '.!?\u2026\u3002\uFF01\uFF1F';
 const _closers = '"\'\u201D\u2019)]';
 
-const _abbreviations = {
-  'mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr', 'st', 'vs', 'etc', 'inc',
-  'ltd', 'co', 'no', 'vol', 'fig', 'mt', 'gen', 'col', 'capt', 'lt', 'sgt',
+const _titles = {
+  'mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr', 'st', 'vs', 'inc',
+  'ltd', 'co', 'vol', 'fig', 'mt', 'gen', 'col', 'capt', 'lt', 'sgt',
 };
 
-bool _isLetter(int u) => (u >= 65 && u <= 90) || (u >= 97 && u <= 122);
+bool _isLetter(int u) =>
+    (u >= 65 && u <= 90) || (u >= 97 && u <= 122);
 bool _isDigit(int u) => u >= 48 && u <= 57;
+bool _isUpper(int u) => u >= 65 && u <= 90;
 
-bool _isFalseEnd(String t, int i) {
-  if (t[i] != '.') return false;
-  // decimals: 3.5
-  if (i > 0 &&
-      i + 1 < t.length &&
-      _isDigit(t.codeUnitAt(i - 1)) &&
-      _isDigit(t.codeUnitAt(i + 1))) {
+/// Returns true when a dot is part of a number, domain, filename, or
+/// abbreviation rather than a sentence boundary.
+bool _isFalseEnd(String text, int i) {
+  if (text[i] != '.') return false;
+
+  // Decimal numbers such as 3.5.
+  if (i > 0 && i + 1 < text.length &&
+      _isDigit(text.codeUnitAt(i - 1)) &&
+      _isDigit(text.codeUnitAt(i + 1))) return true;
+
+  // A dot inside a URL, domain, or filename has no following whitespace.
+  if (i + 1 < text.length && !_isWhitespace(text.codeUnitAt(i + 1))) {
     return true;
   }
-  // word before the dot
-  int s = i;
-  while (s > 0 && _isLetter(t.codeUnitAt(s - 1))) {
-    s--;
+
+  var start = i;
+  while (start > 0 && _isLetter(text.codeUnitAt(start - 1))) {
+    start--;
   }
-  final word = t.substring(s, i);
+  final word = text.substring(start, i).toLowerCase();
   if (word.isEmpty) return false;
-  if (word.length == 1) return true; // initials, "e.g."
-  return _abbreviations.contains(word.toLowerCase());
+
+  // Initials only suppress a boundary when another capitalized name follows.
+  final next = _nextNonWhitespace(text, i + 1);
+  if (word.length == 1) {
+    return next < text.length && _isUpper(text.codeUnitAt(next));
+  }
+
+  // Titles are abbreviations even before a capitalized name ("Dr. Rao").
+  if (_titles.contains(word)) return true;
+
+  // General abbreviations such as "etc." and "no." are context-sensitive:
+  // keep them attached when followed by a lowercase continuation, but allow
+  // a real sentence boundary before a new capitalized sentence.
+  if (word == 'etc' || word == 'no') {
+    return next < text.length && !_isUpper(text.codeUnitAt(next));
+  }
+  return false;
+}
+
+bool _isWhitespace(int u) =>
+    u == 0x20 || (u >= 0x09 && u <= 0x0D) || u == 0xA0;
+
+int _nextNonWhitespace(String text, int from) {
+  var i = from;
+  while (i < text.length && _isWhitespace(text.codeUnitAt(i))) {
+    i++;
+  }
+  return i;
 }
 
 List<Sentence> splitSentences(String text) {
   final out = <Sentence>[];
-  int start = 0;
-  for (int i = 0; i < text.length; i++) {
+  var start = 0;
+  for (var i = 0; i < text.length; i++) {
     if (!_enders.contains(text[i])) continue;
-    // "..." or "?!" -> only split on the last one
+    // Treat runs such as "..." and "?!" as one ending.
     if (i + 1 < text.length && _enders.contains(text[i + 1])) continue;
     if (_isFalseEnd(text, i)) continue;
-    int j = i + 1;
-    while (j < text.length && _closers.contains(text[j])) {
-      j++;
+
+    var end = i + 1;
+    while (end < text.length && _closers.contains(text[end])) {
+      end++;
     }
-    final chunk = text.substring(start, j);
-    if (chunk.trim().isNotEmpty) out.add(Sentence(chunk, start, j));
-    start = j;
-    i = j - 1;
+    // Punctuation in the middle of a token is not a boundary.
+    if (end < text.length && !_isWhitespace(text.codeUnitAt(end))) continue;
+
+    final chunk = text.substring(start, end);
+    if (chunk.trim().isNotEmpty) out.add(Sentence(chunk, start, end));
+    start = end;
+    i = end - 1;
   }
   if (start < text.length) {
     final chunk = text.substring(start);
-    if (chunk.trim().isNotEmpty) out.add(Sentence(chunk, start, text.length));
+    if (chunk.trim().isNotEmpty) {
+      out.add(Sentence(chunk, start, text.length));
+    }
   }
   return out;
 }
