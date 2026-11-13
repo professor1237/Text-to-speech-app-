@@ -36,18 +36,22 @@ class _BrowserScreenState extends State<BrowserScreen> {
   bool _pageReady = false;
   String? _currentUrl;
 
-  /// The page that is being read aloud. Kept apart from [_currentUrl] so the
-  /// Pause / Stop buttons still work after you open another page.
   String? _readOwner;
   int _lastIndex = -1;
   List<TermRule> _rules = [];
   String _lastHighlightKey = '';
+
+  List<SentenceRef> _queue = [];
 
   @override
   void initState() {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel(
+        'TtsReader',
+        onMessageReceived: (msg) => _onDoubleTapText(msg.message),
+      )
       ..setNavigationDelegate(NavigationDelegate(
         onNavigationRequest: (req) {
           final u = Uri.tryParse(req.url);
@@ -55,7 +59,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           if (u != null && ok.contains(u.scheme)) {
             return NavigationDecision.navigate;
           }
-          return NavigationDecision.prevent; // intent://, market:// ...
+          return NavigationDecision.prevent;
         },
         onPageStarted: (url) {
           if (!mounted) return;
@@ -65,6 +69,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
             _pageReadDone = false;
             _currentUrl = url;
             _urlController.text = url;
+            _queue = [];
           });
         },
         onUrlChange: (change) {
@@ -81,6 +86,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
             _loading = false;
             _pageReady = true;
           });
+          try {
+            await _controller.runJavaScript(WebReaderService.doubleTapScript);
+          } catch (_) {}
           if (_autoRead && !_pageReadDone) {
             _pageReadDone = true;
             await Future.delayed(const Duration(milliseconds: 500));
@@ -120,17 +128,19 @@ class _BrowserScreenState extends State<BrowserScreen> {
     setState(() {});
   }
 
-  /// Selects the sentence on the page (this also scrolls it into view).
   Future<void> _highlight(String sentence, bool backwards) async {
     final js = '''
       (function(t, back) {
         try {
           t = (t || '').replace(/\\s+/g, ' ').trim();
           if (!t || !window.find) return;
+          try {
+            var sel = window.getSelection();
+            if (sel) sel.removeAllRanges();
+          } catch (_) {}
           var ok = window.find(t, false, back, true, false, false, false);
-          if (!ok && t.length > 60) {
-            // long sentence split across tags: find its beginning
-            window.find(t.substring(0, 60), false, back, true, false, false, false);
+          if (!ok && t.length > 40) {
+            window.find(t.substring(0, 40), false, back, true, false, false, false);
           }
         } catch (e) {}
       })(${jsonEncode(sentence)}, $backwards);
@@ -152,7 +162,30 @@ class _BrowserScreenState extends State<BrowserScreen> {
     return raw.toString();
   }
 
-  Future<void> _readPage() async {
+  Future<void> _onDoubleTapText(String snippet) async {
+    if (!mounted) return;
+    final text = snippet.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (text.length < 2) return;
+
+    if (_queue.isEmpty) {
+      await _readPage(startFromSnippet: text);
+      return;
+    }
+
+    final idx = WebReaderService.findBestSentenceIndex(_queue, text);
+    if (idx < 0) {
+      _snack('Could not find that sentence on the page.');
+      return;
+    }
+
+    _readOwner = _currentUrl;
+    _lastIndex = -1;
+    _lastHighlightKey = '';
+    _speech.setRules(_rules);
+    await _speech.speak(_queue, idx, _rules, owner: _readOwner);
+  }
+
+  Future<void> _readPage({String? startFromSnippet}) async {
     if (!_pageReady || _currentUrl == null) {
       _snack('Wait for the page to finish loading.');
       return;
@@ -166,6 +199,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
         _snack('No readable text found on this page.');
         return;
       }
+
+      try {
+        await _controller.runJavaScript(WebReaderService.doubleTapScript);
+      } catch (_) {}
+
       String title = url;
       try {
         final t =
@@ -173,22 +211,32 @@ class _BrowserScreenState extends State<BrowserScreen> {
         final ts = _extractString(t).trim();
         if (ts.isNotEmpty) title = ts;
       } catch (_) {}
+
       audioHandler.updateMediaItem(MediaItem(
         id: url,
         title: title,
         artist: Uri.parse(url).host,
       ));
+
+      _queue = queue;
       _readOwner = url;
       _lastIndex = -1;
       _lastHighlightKey = '';
       _speech.setRules(_rules);
-      await _speech.speak(queue, 0, _rules, owner: url);
+
+      int start = 0;
+      if (startFromSnippet != null && startFromSnippet.isNotEmpty) {
+        final idx =
+            WebReaderService.findBestSentenceIndex(queue, startFromSnippet);
+        if (idx >= 0) start = idx;
+      }
+
+      await _speech.speak(queue, start, _rules, owner: url);
     } catch (e) {
       _snack('Could not read this page: $e');
     }
   }
 
-  /// Saves the open page into the library so it can be read later.
   Future<void> _saveToLibrary() async {
     if (!_pageReady || _currentUrl == null) {
       _snack('Wait for the page to finish loading.');
@@ -270,7 +318,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        // Back goes to the previous web page first, then leaves the browser.
         if (await _controller.canGoBack()) {
           await _controller.goBack();
         } else if (mounted) {
@@ -352,7 +399,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                     IconButton(
                       icon: const Icon(Icons.record_voice_over),
                       tooltip: 'Read this page',
-                      onPressed: _readPage,
+                      onPressed: () => _readPage(),
                     ),
                     IconButton(
                       icon:
