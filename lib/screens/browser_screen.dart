@@ -182,6 +182,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _lastIndex = -1;
     _lastHighlightKey = '';
     _speech.setRules(_rules);
+    _speech.setBookMetadata(_currentUrl ?? 'Web page', 'Web page', const []);
     await _speech.speak(_queue, idx, _rules, owner: _readOwner);
   }
 
@@ -220,6 +221,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
       _queue = queue;
       _readOwner = url;
+      _speech.setBookMetadata(title, Uri.parse(url).host, const []);
       _lastIndex = -1;
       _lastHighlightKey = '';
       _speech.setRules(_rules);
