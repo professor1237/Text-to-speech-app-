@@ -57,10 +57,10 @@ class EpubService {
 
     collect(book.Chapters);
 
-    // A missing or broken TOC must not make an otherwise readable EPUB fail.
-    // Content.Html preserves the package's HTML file order.
-    if (chapters.isEmpty) {
-      for (final entry in htmlFiles.entries) {
+    // Some books have an incomplete TOC. Append content files that were not
+    // referenced by navigation so their readable text is not lost.
+    for (final entry in htmlFiles.entries) {
+      if (!seenFiles.contains(entry.key)) {
         addChapter(null, entry.key, entry.value.Content);
       }
     }
