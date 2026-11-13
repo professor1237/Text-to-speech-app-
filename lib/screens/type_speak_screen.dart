@@ -109,6 +109,7 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
     final prefs = await SharedPreferences.getInstance();
     final rules = decodeRules(prefs.getString('term_rules'));
     _queuedText = text;
+    _speech.setBookMetadata('Typed text', 'Tts', const []);
     audioHandler.updateMediaItem(const MediaItem(
       id: _owner,
       title: 'Typed text',
