@@ -49,6 +49,8 @@ class SpeechController extends ChangeNotifier {
   SentenceRef? get current =>
       (_index >= 0 && _index < _queue.length) ? _queue[_index] : null;
 
+  Future<void> initialize() => _init();
+
   Future<void> _init() {
     if (_ready) return Future<void>.value();
     return _initializing ??= _initialize();
