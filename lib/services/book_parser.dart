@@ -292,7 +292,7 @@ class BookParser {
     String textWithBreaks(dom.Node node) {
       if (node is dom.Text) return node.text;
       if (node is dom.Element && node.localName?.toLowerCase() == 'br') {
-        return '\\n';
+        return '\n';
       }
       if (node is dom.Element &&
           _skipTags.contains(node.localName?.toLowerCase() ?? '')) return '';
@@ -301,7 +301,7 @@ class BookParser {
 
     void addTextBlock(dom.Element el, BlockType type) {
       final raw = textWithBreaks(el);
-      for (final part in raw.split(RegExp(r'\\n+'))) {
+      for (final part in raw.split(RegExp(r'\n+'))) {
         final text = _normalize(part);
         if (text.isNotEmpty) out.add(Block(text, type));
       }
