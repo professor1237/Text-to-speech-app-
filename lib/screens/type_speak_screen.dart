@@ -7,7 +7,7 @@ import '../models/sentence.dart';
 import '../models/term_rule.dart';
 import '../services/speech_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'voice_sheet.dart';
+import 'settings_sheet.dart';
 
 /// Paste or type any text and have it read aloud.
 class TypeSpeakScreen extends StatefulWidget {
@@ -129,12 +129,12 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
         title: const Text('Type & Speak'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.record_voice_over),
-            tooltip: 'Voice and sleep timer',
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
             onPressed: () => showModalBottomSheet(
               context: context,
               isScrollControlled: true,
-              builder: (_) => const VoiceSheet(),
+              builder: (_) => const SettingsSheet(),
             ),
           ),
         ],
@@ -206,11 +206,6 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
                   icon: Icon(playing ? Icons.pause_circle : Icons.play_circle),
                   iconSize: 48,
                   onPressed: playing ? () => _speech.pause() : _play,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.stop_circle),
-                  iconSize: 40,
-                  onPressed: active ? () => _speech.stop() : null,
                 ),
                 IconButton(
                   icon: const Icon(Icons.skip_next),
