@@ -210,11 +210,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _askBackgroundPermissions() async {
     if (_askedPermissions) return;
     _askedPermissions = true;
+    final prefs = await SharedPreferences.getInstance();
     if (!await Permission.notification.isGranted) {
-      await Permission.notification.request();
+      final asked = prefs.getBool('notification_permission_prompted') ?? false;
+      if (!asked) {
+        await Permission.notification.request();
+        await prefs.setBool('notification_permission_prompted', true);
+      }
     }
     if (!await Permission.ignoreBatteryOptimizations.isGranted) {
-      await Permission.ignoreBatteryOptimizations.request();
+      final asked = prefs.getBool('battery_optimization_prompted') ?? false;
+      if (!asked) {
+        await Permission.ignoreBatteryOptimizations.request();
+        await prefs.setBool('battery_optimization_prompted', true);
+      }
     }
   }
   void _playFrom(int index) {
