@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 
 class LibraryDB {
   static Database? _db;
+  static const _maxStoredCoverBytes = 512 * 1024;
 
   static Future<Database> _open() async {
     if (_db != null) return _db!;
@@ -26,7 +27,14 @@ class LibraryDB {
 
   static Future<List<Map<String, dynamic>>> all() async {
     final db = await _open();
-    return db.query('books', orderBy: 'id DESC');
+    // Avoid loading unusually large embedded covers into every library row.
+    // Older database versions may already contain oversized images.
+    return db.rawQuery(
+      'SELECT id, path, title, author, '
+      'CASE WHEN length(cover) <= ? THEN cover ELSE NULL END AS cover '
+      'FROM books ORDER BY id DESC',
+      [_maxStoredCoverBytes],
+    );
   }
 
   static Future<void> insert(
@@ -34,7 +42,7 @@ class LibraryDB {
     final db = await _open();
     await db.insert(
       'books',
-      {'path': path, 'title': title, 'author': author, 'cover': cover},
+      {'path': path, 'title': title, 'author': author, 'cover': cover != null && cover.length <= _maxStoredCoverBytes ? cover : null},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
