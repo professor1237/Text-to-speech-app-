@@ -272,7 +272,8 @@ class BookParser {
   // ------------------------------------------------------------------
 
   static const _blockTags = {
-    'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre'
+    'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre',
+    'td', 'th'
   };
   static const _skipTags = {'script', 'style', 'head', 'nav', 'svg', 'noscript'};
 
@@ -288,12 +289,36 @@ class BookParser {
     final out = <Block>[];
     if (root == null) return out;
 
+    String textWithBreaks(dom.Node node) {
+      if (node is dom.Text) return node.text;
+      if (node is dom.Element && node.localName?.toLowerCase() == 'br') {
+        return '\\n';
+      }
+      if (node is dom.Element &&
+          _skipTags.contains(node.localName?.toLowerCase() ?? '')) return '';
+      return node.nodes.map(textWithBreaks).join();
+    }
+
+    void addTextBlock(dom.Element el, BlockType type) {
+      final raw = textWithBreaks(el);
+      for (final part in raw.split(RegExp(r'\\n+'))) {
+        final text = _normalize(part);
+        if (text.isNotEmpty) out.add(Block(text, type));
+      }
+    }
+
     void walk(dom.Element el) {
       final tag = el.localName?.toLowerCase() ?? '';
       if (_skipTags.contains(tag)) return;
       if (_blockTags.contains(tag)) {
-        final text = _normalize(el.text);
-        if (text.isNotEmpty) out.add(Block(text, _htmlType(tag)));
+        addTextBlock(el, _htmlType(tag));
+        return;
+      }
+      // Some EPUBs contain only divs (or table cells) instead of paragraphs.
+      // Treat a div as a block only when it has no semantic child blocks.
+      if (tag == 'div' &&
+          el.querySelector(_blockTags.join(',')) == null) {
+        addTextBlock(el, BlockType.paragraph);
         return;
       }
       for (final child in el.children) {
