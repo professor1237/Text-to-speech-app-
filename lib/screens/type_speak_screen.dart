@@ -2,7 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart'; // global audioHandler
+import '../main.dart';
 import '../models/sentence.dart';
 import '../models/term_rule.dart';
 import '../services/speech_controller.dart';
@@ -23,6 +23,8 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
 
   final _speech = SpeechController.instance;
   final _controller = TextEditingController();
+  String? _queuedText;
+  String? _lastShownSpeechError;
 
   @override
   void initState() {
@@ -40,7 +42,15 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
   }
 
   void _onSpeech() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final error = _speech.lastError;
+    if (error != null && error != _lastShownSpeechError) {
+      _lastShownSpeechError = error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
+    setState(() {});
   }
 
   Future<void> _loadDraft() async {
@@ -56,25 +66,35 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
 
   bool get _mine => _speech.owner == _owner;
 
-  Future<void> _paste() async {
+  Future<bool> _paste() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final t = data?.text;
-    if (t == null || t.trim().isEmpty) return;
-    setState(() => _controller.text = t);
+    if (t == null || t.trim().isEmpty) return false;
+    if (!mounted) return false;
+    setState(() => _controller.value = TextEditingValue(
+          text: t,
+          selection: TextSelection.collapsed(offset: t.length),
+        ));
+    return true;
   }
 
   Future<void> _pasteAndSpeak() async {
     await _paste();
-    await _play();
+    // Deliberately start a fresh queue. Never resume the previous clipboard
+    // contents after the editor has been changed.
+    await _play(forceNew: true);
   }
 
-  Future<void> _play() async {
-    if (_speech.state == SpeechState.paused && _mine) {
-      _speech.resume();
-      return;
-    }
+  Future<void> _play({bool forceNew = false}) async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    if (!forceNew &&
+        _speech.state == SpeechState.paused &&
+        _mine &&
+        text == _queuedText) {
+      await _speech.resume();
+      return;
+    }
     FocusScope.of(context).unfocus();
 
     final queue = <SentenceRef>[];
@@ -88,12 +108,14 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     final rules = decodeRules(prefs.getString('term_rules'));
+    _queuedText = text;
+    _speech.setBookMetadata('Typed text', 'Tts', const []);
     audioHandler.updateMediaItem(const MediaItem(
       id: _owner,
       title: 'Typed text',
       artist: 'Tts',
     ));
-    _speech.speak(queue, 0, rules, owner: _owner);
+    await _speech.speak(queue, 0, rules, owner: _owner);
   }
 
   @override
@@ -121,25 +143,26 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 OutlinedButton.icon(
                   onPressed: _paste,
                   icon: const Icon(Icons.content_paste),
                   label: const Text('Paste'),
                 ),
-                const SizedBox(width: 8),
                 FilledButton.tonalIcon(
                   onPressed: _pasteAndSpeak,
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Paste & speak'),
                 ),
-                const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.clear),
                   tooltip: 'Clear',
                   onPressed: () {
-                    _speech.stop();
+                    if (_mine) _speech.stop();
                     setState(_controller.clear);
                   },
                 ),
@@ -155,6 +178,7 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Type or paste text here',
                   border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
                 ),
               ),
             ),
@@ -167,7 +191,8 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
                   color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(current, maxLines: 3, overflow: TextOverflow.ellipsis),
+                child: Text(current,
+                    maxLines: 3, overflow: TextOverflow.ellipsis),
               ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,

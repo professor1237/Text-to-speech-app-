@@ -72,6 +72,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   int _lastBlock = -1;
   String? _error;
   double _speed = 0.5;
+  String? _lastShownSpeechError;
 
   String get _posKey => 'pos_${widget.filePath}';
 
@@ -100,6 +101,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _load() async {
     try {
+      await _speech.initialize();
+      if (mounted) setState(() => _speed = _speech.rate);
       // Heavy work runs in the background so the app never freezes.
       final loaded = await compute(
         _loadBookInBackground,
@@ -120,6 +123,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (start < 0 || start >= queue.length) start = 0;
 
       _speech.setRules(rules);
+      _speech.setBookMetadata(
+        book.title,
+        book.author,
+        book.chapters.map((chapter) => chapter.title).toList(),
+      );
       if (!mounted) return;
       setState(() {
         _book = book;
@@ -156,10 +164,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _onSpeechChanged() {
     if (!mounted || _book == null) return;
+    final error = _speech.lastError;
+    if (error != null && error != _lastShownSpeechError) {
+      _lastShownSpeechError = error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
     final cur = _speech.current;
     if (cur != null && _speech.owner == widget.filePath) {
       _startIndex = _speech.index;
-      _savePosition();
       if (cur.chapter != _chapter) {
         setState(() => _chapter = cur.chapter);
         _updateMediaItem(cur.chapter);
@@ -196,11 +210,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _askBackgroundPermissions() async {
     if (_askedPermissions) return;
     _askedPermissions = true;
+    final prefs = await SharedPreferences.getInstance();
     if (!await Permission.notification.isGranted) {
-      await Permission.notification.request();
+      final asked = prefs.getBool('notification_permission_prompted') ?? false;
+      if (!asked) {
+        await Permission.notification.request();
+        await prefs.setBool('notification_permission_prompted', true);
+      }
     }
     if (!await Permission.ignoreBatteryOptimizations.isGranted) {
-      await Permission.ignoreBatteryOptimizations.request();
+      final asked = prefs.getBool('battery_optimization_prompted') ?? false;
+      if (!asked) {
+        await Permission.ignoreBatteryOptimizations.request();
+        await prefs.setBool('battery_optimization_prompted', true);
+      }
     }
   }
   void _playFrom(int index) {

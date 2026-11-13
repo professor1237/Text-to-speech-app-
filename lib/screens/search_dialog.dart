@@ -20,6 +20,9 @@ class _SearchDialogState extends State<SearchDialog> {
   final _controller = TextEditingController();
   List<int> _hits = [];
   String _query = '';
+  late final List<String> _searchText = widget.queue
+      .map((item) => item.sentence.text.toLowerCase())
+      .toList(growable: false);
 
   @override
   void dispose() {
@@ -30,9 +33,9 @@ class _SearchDialogState extends State<SearchDialog> {
   void _search(String q) {
     final needle = q.trim().toLowerCase();
     final hits = <int>[];
-    if (needle.length >= 2) {
-      for (int i = 0; i < widget.queue.length; i++) {
-        if (widget.queue[i].sentence.text.toLowerCase().contains(needle)) {
+    if (needle.isNotEmpty) {
+      for (int i = 0; i < _searchText.length; i++) {
+        if (_searchText[i].contains(needle)) {
           hits.add(i);
           if (hits.length >= _maxResults) break;
         }
@@ -67,8 +70,8 @@ class _SearchDialogState extends State<SearchDialog> {
             Expanded(
               child: _hits.isEmpty
                   ? Center(
-                      child: Text(_query.length < 2
-                          ? 'Type at least 2 letters'
+                      child: Text(_query.isEmpty
+                          ? 'Type a word or character'
                           : 'No matches'),
                     )
                   : ListView.separated(

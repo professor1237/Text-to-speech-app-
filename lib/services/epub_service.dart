@@ -22,19 +22,52 @@ class EpubService {
   static Future<BookContent> parse(Uint8List bytes) async {
     final book = await epub.EpubReader.readBook(bytes);
     final chapters = <Chapter>[];
+    final seenFiles = <String>{};
+    final htmlFiles = book.Content?.Html ?? <String, epub.EpubTextContentFile>{};
+
+    void addChapter(String? title, String? fileName, String? html) {
+      final key = (fileName ?? '').trim();
+      if (key.isNotEmpty && !seenFiles.add(key)) return;
+      if (html == null || html.trim().isEmpty) {
+        if (key.isNotEmpty) seenFiles.remove(key);
+        return;
+      }
+      final blocks = _htmlToBlocks(html);
+      if (blocks.isNotEmpty) {
+        chapters.add(Chapter(
+          title?.trim().isNotEmpty == true ? title!.trim() : 'Section ${chapters.length + 1}',
+          blocks,
+        ));
+      } else if (key.isNotEmpty) {
+        seenFiles.remove(key);
+      }
+    }
 
     void collect(List<epub.EpubChapter>? list) {
-      for (final c in list ?? <epub.EpubChapter>[]) {
-        final html = c.HtmlContent;
-        if (html != null && html.trim().isNotEmpty) {
-          final blocks = _htmlToBlocks(html);
-          if (blocks.isNotEmpty) chapters.add(Chapter(c.Title ?? '', blocks));
-        }
-        collect(c.SubChapters);
+      for (final chapter in list ?? <epub.EpubChapter>[]) {
+        final fileName = chapter.ContentFileName;
+        final html = chapter.HtmlContent ??
+            (fileName == null ? null : htmlFiles[fileName]?.Content);
+        // EPUB navigation entries may point to different anchors in the same
+        // XHTML file. Read that file once rather than repeating the whole page.
+        addChapter(chapter.Title, fileName, html);
+        collect(chapter.SubChapters);
       }
     }
 
     collect(book.Chapters);
+
+    // Some books have an incomplete TOC. Append content files that were not
+    // referenced by navigation so their readable text is not lost.
+    for (final entry in htmlFiles.entries) {
+      if (!seenFiles.contains(entry.key)) {
+        addChapter(null, entry.key, entry.value.Content);
+      }
+    }
+    if (chapters.isEmpty) {
+      throw Exception('No readable chapters found in this EPUB.');
+    }
+
     return BookContent(
       book.Title ?? 'Untitled',
       book.Author ?? 'Unknown',
@@ -58,7 +91,7 @@ class EpubService {
 
   static const _blockTags = {
     'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'li', 'blockquote', 'pre'
+    'li', 'blockquote', 'pre', 'td', 'th'
   };
   static const _skipTags = {'script', 'style', 'head', 'nav', 'svg', 'noscript'};
 
@@ -67,12 +100,32 @@ class EpubService {
     final out = <Block>[];
     if (doc == null) return out;
 
+    String textWithBreaks(dom.Node node) {
+      if (node is dom.Text) return node.text;
+      if (node is dom.Element && node.localName?.toLowerCase() == 'br') {
+        return '\n';
+      }
+      if (node is dom.Element &&
+          _skipTags.contains(node.localName?.toLowerCase() ?? '')) return '';
+      return node.nodes.map(textWithBreaks).join();
+    }
+
+    void addTextBlock(dom.Element el, BlockType type) {
+      for (final part in textWithBreaks(el).split(RegExp(r'\n+'))) {
+        final text = _normalize(part);
+        if (text.isNotEmpty) out.add(Block(text, type));
+      }
+    }
+
     void walk(dom.Element el) {
       final tag = el.localName?.toLowerCase() ?? '';
       if (_skipTags.contains(tag)) return;
       if (_blockTags.contains(tag)) {
-        final text = _normalize(el.text);
-        if (text.isNotEmpty) out.add(Block(text, _typeOf(tag)));
+        addTextBlock(el, _typeOf(tag));
+        return;
+      }
+      if (tag == 'div' && el.querySelector(_blockTags.join(',')) == null) {
+        addTextBlock(el, BlockType.paragraph);
         return;
       }
       for (final child in el.children) walk(child);

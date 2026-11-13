@@ -25,61 +25,124 @@ class _TermsScreenState extends State<TermsScreen> {
     await prefs.setString('term_rules', encodeRules(_rules));
   }
 
-  Future<void> _addDialog() async {
-    final find = TextEditingController();
-    final replace = TextEditingController();
-    bool regex = false;
+  Future<void> _editDialog([int? editIndex]) async {
+    final existing = editIndex == null ? null : _rules[editIndex];
+    final find = TextEditingController(text: existing?.find ?? '');
+    final replace = TextEditingController(text: existing?.replace ?? '');
+    var regex = existing?.regex ?? false;
+    var caseSensitive = existing?.caseSensitive ?? true;
+    String? validationError;
+
     final result = await showDialog<TermRule>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('New replacement'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: find,
-                decoration: const InputDecoration(labelText: 'Find'),
-              ),
-              TextField(
-                controller: replace,
-                decoration: const InputDecoration(labelText: 'Replace with'),
-              ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Regex'),
-                value: regex,
-                onChanged: (v) => setLocal(() => regex = v ?? false),
-              ),
-            ],
+          title: Text(existing == null ? 'New replacement' : 'Edit replacement'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: find,
+                  decoration: InputDecoration(
+                    labelText: 'Find',
+                    errorText: validationError,
+                  ),
+                  onChanged: (_) => setLocal(() => validationError = null),
+                ),
+                TextField(
+                  controller: replace,
+                  decoration: const InputDecoration(labelText: 'Replace with'),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Regular expression'),
+                  value: regex,
+                  onChanged: (v) => setLocal(() {
+                    regex = v ?? false;
+                    validationError = null;
+                  }),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Case-sensitive'),
+                  value: caseSensitive,
+                  onChanged: (v) =>
+                      setLocal(() => caseSensitive = v ?? true),
+                ),
+                if (validationError != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      validationError!,
+                      style: TextStyle(
+                        color: Theme.of(ctx).colorScheme.error,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel'),
             ),
-            TextButton(
+            FilledButton(
               onPressed: () {
-                if (find.text.isEmpty) return;
+                final pattern = find.text.trim();
+                if (pattern.isEmpty) {
+                  setLocal(() => validationError = 'Enter text to find.');
+                  return;
+                }
+                if (regex) {
+                  try {
+                    RegExp(pattern, caseSensitive: caseSensitive);
+                  } on FormatException {
+                    setLocal(() => validationError = 'This regular expression is invalid.');
+                    return;
+                  }
+                }
                 Navigator.pop(
                   ctx,
                   TermRule(
-                    find: find.text,
+                    find: pattern,
                     replace: replace.text,
                     regex: regex,
+                    caseSensitive: caseSensitive,
+                    enabled: existing?.enabled ?? true,
                   ),
                 );
               },
-              child: const Text('Add'),
+              child: Text(existing == null ? 'Add' : 'Save'),
             ),
           ],
         ),
       ),
     );
-    if (result != null) {
-      setState(() => _rules.add(result));
-      _save();
+
+    find.dispose();
+    replace.dispose();
+    if (result != null && mounted) {
+      setState(() {
+        if (editIndex == null) {
+          _rules.add(result);
+        } else {
+          _rules[editIndex] = result;
+        }
+      });
+      await _save();
     }
+  }
+
+  Future<void> _remove(int index) async {
+    setState(() => _rules.removeAt(index));
+    await _save();
+  }
+
+  Future<void> _toggleEnabled(int index, bool enabled) async {
+    setState(() => _rules[index] = _rules[index].copyWith(enabled: enabled));
+    await _save();
   }
 
   @override
@@ -101,26 +164,30 @@ class _TermsScreenState extends State<TermsScreen> {
               itemCount: _rules.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
-                final r = _rules[i];
+                final rule = _rules[i];
                 return ListTile(
-                  title: Text('${r.find}  ->  ${r.replace}'),
-                  subtitle: Text(r.regex ? 'regex' : 'plain text'),
+                  title: Text('${rule.find}  →  ${rule.replace}'),
+                  subtitle: Text(
+                    '${rule.regex ? 'regex' : 'plain text'} · '
+                    '${rule.caseSensitive ? 'case-sensitive' : 'case-insensitive'}',
+                  ),
+                  onTap: () => _editDialog(i),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Switch(
-                        value: r.enabled,
-                        onChanged: (v) {
-                          setState(() => _rules[i] = r.copyWith(enabled: v));
-                          _save();
-                        },
+                        value: rule.enabled,
+                        onChanged: (v) => _toggleEnabled(i, v),
                       ),
                       IconButton(
+                        tooltip: 'Edit replacement',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => _editDialog(i),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete replacement',
                         icon: const Icon(Icons.delete_outline),
-                        onPressed: () {
-                          setState(() => _rules.removeAt(i));
-                          _save();
-                        },
+                        onPressed: () => _remove(i),
                       ),
                     ],
                   ),
@@ -128,7 +195,8 @@ class _TermsScreenState extends State<TermsScreen> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _addDialog,
+        onPressed: _editDialog,
+        tooltip: 'Add replacement',
         child: const Icon(Icons.add),
       ),
     );
