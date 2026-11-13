@@ -76,6 +76,24 @@ void main() {
     });
   });
 
+  test('parses div-only HTML and preserves br line breaks', () async {
+    final html = '''
+      <html><body>
+        <div>First line<br>Second line</div>
+        <table><tr><td>Table cell text</td></tr></table>
+      </body></html>
+    ''';
+    final book = await BookParser.parse(
+      BookInput('sample.html', Uint8List.fromList(utf8.encode(html)), 'Sample'),
+    );
+    final paragraphs = book.chapters
+        .expand((chapter) => chapter.blocks)
+        .map((block) => block.text)
+        .toList();
+
+    expect(paragraphs, ['First line', 'Second line', 'Table cell text']);
+  });
+
   test('parses UTF-8 text files into readable paragraphs', () async {
     final bytes = Uint8List.fromList(
       utf8.encode('First paragraph.\n\nSecond paragraph.'),
