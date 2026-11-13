@@ -43,6 +43,10 @@ bool _isFalseEnd(String text, int i) {
   // Initials only suppress a boundary when another capitalized name follows.
   final next = _nextNonWhitespace(text, i + 1);
   if (word.length == 1) {
+    // Keep the second initial in "J. R. Tolkien".
+    if (start >= 2 && text[start - 1] == ' ' && text[start - 2] == '.') {
+      return true;
+    }
     // Keep paired initials such as "J. R. Tolkien", but allow a single
     // letter at the end of a phrase ("Plan B. Next") to end the sentence.
     if (next + 2 < text.length &&
