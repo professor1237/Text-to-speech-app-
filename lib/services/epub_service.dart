@@ -22,19 +22,52 @@ class EpubService {
   static Future<BookContent> parse(Uint8List bytes) async {
     final book = await epub.EpubReader.readBook(bytes);
     final chapters = <Chapter>[];
+    final seenFiles = <String>{};
+    final htmlFiles = book.Content?.Html ?? <String, epub.EpubTextContentFile>{};
+
+    void addChapter(String? title, String? fileName, String? html) {
+      final key = (fileName ?? '').trim();
+      if (key.isNotEmpty && !seenFiles.add(key)) return;
+      if (html == null || html.trim().isEmpty) {
+        if (key.isNotEmpty) seenFiles.remove(key);
+        return;
+      }
+      final blocks = _htmlToBlocks(html);
+      if (blocks.isNotEmpty) {
+        chapters.add(Chapter(
+          title?.trim().isNotEmpty == true ? title!.trim() : 'Section ${chapters.length + 1}',
+          blocks,
+        ));
+      } else if (key.isNotEmpty) {
+        seenFiles.remove(key);
+      }
+    }
 
     void collect(List<epub.EpubChapter>? list) {
-      for (final c in list ?? <epub.EpubChapter>[]) {
-        final html = c.HtmlContent;
-        if (html != null && html.trim().isNotEmpty) {
-          final blocks = _htmlToBlocks(html);
-          if (blocks.isNotEmpty) chapters.add(Chapter(c.Title ?? '', blocks));
-        }
-        collect(c.SubChapters);
+      for (final chapter in list ?? <epub.EpubChapter>[]) {
+        final fileName = chapter.ContentFileName;
+        final html = chapter.HtmlContent ??
+            (fileName == null ? null : htmlFiles[fileName]?.Content);
+        // EPUB navigation entries may point to different anchors in the same
+        // XHTML file. Read that file once rather than repeating the whole page.
+        addChapter(chapter.Title, fileName, html);
+        collect(chapter.SubChapters);
       }
     }
 
     collect(book.Chapters);
+
+    // A missing or broken TOC must not make an otherwise readable EPUB fail.
+    // Content.Html preserves the package's HTML file order.
+    if (chapters.isEmpty) {
+      for (final entry in htmlFiles.entries) {
+        addChapter(null, entry.key, entry.value.Content);
+      }
+    }
+    if (chapters.isEmpty) {
+      throw Exception('No readable chapters found in this EPUB.');
+    }
+
     return BookContent(
       book.Title ?? 'Untitled',
       book.Author ?? 'Unknown',
