@@ -24,6 +24,7 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
   final _speech = SpeechController.instance;
   final _controller = TextEditingController();
   String? _queuedText;
+  String? _lastShownSpeechError;
 
   @override
   void initState() {
@@ -41,7 +42,15 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
   }
 
   void _onSpeech() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final error = _speech.lastError;
+    if (error != null && error != _lastShownSpeechError) {
+      _lastShownSpeechError = error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
+    setState(() {});
   }
 
   Future<void> _loadDraft() async {
