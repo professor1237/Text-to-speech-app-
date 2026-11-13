@@ -1,18 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../main.dart' show audioHandler;
 import '../models/term_rule.dart';
-import '../services/book_parser.dart';
 import '../services/library_db.dart';
 import '../services/speech_controller.dart';
 import '../services/web_reader_service.dart';
@@ -20,7 +14,10 @@ import 'terms_screen.dart';
 import 'voice_sheet.dart';
 
 class BrowserScreen extends StatefulWidget {
-  const BrowserScreen({super.key});
+  const BrowserScreen({super.key, this.initialUrl, this.openInNewTab = false});
+
+  final String? initialUrl;
+  final bool openInNewTab;
   @override
   State<BrowserScreen> createState() => _BrowserScreenState();
 }
@@ -35,6 +32,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
   bool _pageReadDone = false;
   bool _pageReady = false;
   String? _currentUrl;
+  final List<String> _tabs = [];
+  int _activeTabIndex = 0;
+  bool _tabsReady = false;
 
   String? _readOwner;
   int _lastIndex = -1;
@@ -69,6 +69,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
             _pageReadDone = false;
             _currentUrl = url;
             _urlController.text = url;
+            if (_tabsReady && _tabs.isNotEmpty) {
+              _tabs[_activeTabIndex] = url;
+              _persistTabs();
+            }
             _queue = [];
           });
         },
@@ -78,6 +82,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
           setState(() {
             _currentUrl = url;
             _urlController.text = url;
+            if (_tabsReady && _tabs.isNotEmpty) {
+              _tabs[_activeTabIndex] = url;
+              _persistTabs();
+            }
           });
         },
         onPageFinished: (url) async {
@@ -101,10 +109,106 @@ class _BrowserScreenState extends State<BrowserScreen> {
             _snack('Could not load the page: ${e.description}');
           }
         },
-      ))
-      ..loadRequest(Uri.parse('https://duckduckgo.com/'));
+      ));
     _speech.addListener(_onSpeechChanged);
     _loadRules();
+    _restoreTabs();
+  }
+
+  static const _tabsKey = 'browser_open_tabs_v1';
+  static const _activeTabKey = 'browser_active_tab_v1';
+
+  Future<void> _restoreTabs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = List<String>.from(prefs.getStringList(_tabsKey) ?? const []);
+    final requested = widget.initialUrl;
+    if (requested != null && requested.isNotEmpty) {
+      if (widget.openInNewTab || saved.isEmpty) {
+        saved.add(requested);
+      } else {
+        final oldIndex = prefs.getInt(_activeTabKey) ?? 0;
+        if (oldIndex >= 0 && oldIndex < saved.length) {
+          saved[oldIndex] = requested;
+        } else {
+          saved.add(requested);
+        }
+      }
+    }
+    if (saved.isEmpty) saved.add('https://duckduckgo.com/');
+    final selected = requested != null && widget.openInNewTab
+        ? saved.length - 1
+        : (prefs.getInt(_activeTabKey) ?? 0).clamp(0, saved.length - 1);
+    if (!mounted) return;
+    setState(() {
+      _tabs..clear()..addAll(saved);
+      _activeTabIndex = selected;
+      _tabsReady = true;
+      _currentUrl = _tabs[selected];
+      _urlController.text = _currentUrl!;
+    });
+    await _persistTabs();
+    await _controller.loadRequest(Uri.parse(_tabs[selected]));
+  }
+
+  Future<void> _persistTabs() async {
+    if (_tabs.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_tabsKey, _tabs);
+    await prefs.setInt(_activeTabKey, _activeTabIndex);
+  }
+
+  Future<void> _selectTab(int index) async {
+    if (index < 0 || index >= _tabs.length || index == _activeTabIndex) return;
+    await _speech.stop();
+    setState(() {
+      _activeTabIndex = index;
+      _currentUrl = _tabs[index];
+      _urlController.text = _tabs[index];
+      _queue = [];
+      _pageReady = false;
+      _pageReadDone = false;
+    });
+    await _persistTabs();
+    await _controller.loadRequest(Uri.parse(_tabs[index]));
+  }
+
+  Future<void> _addTab([String? url]) async {
+    final next = url ?? 'https://duckduckgo.com/';
+    await _speech.stop();
+    setState(() {
+      _tabs.add(next);
+      _activeTabIndex = _tabs.length - 1;
+      _currentUrl = next;
+      _urlController.text = next;
+      _queue = [];
+      _pageReady = false;
+      _pageReadDone = false;
+    });
+    await _persistTabs();
+    await _controller.loadRequest(Uri.parse(next));
+  }
+
+  Future<void> _closeTab(int index) async {
+    if (index < 0 || index >= _tabs.length) return;
+    await _speech.stop();
+    setState(() {
+      _tabs.removeAt(index);
+      if (_tabs.isEmpty) {
+        _tabs.add('https://duckduckgo.com/');
+        _activeTabIndex = 0;
+      } else if (_activeTabIndex > index) {
+        _activeTabIndex--;
+      } else if (_activeTabIndex >= _tabs.length) {
+        _activeTabIndex = _tabs.length - 1;
+      }
+      _currentUrl = _tabs[_activeTabIndex];
+      _urlController.text = _tabs[_activeTabIndex];
+      _queue = [];
+      _pageReady = false;
+      _pageReadDone = false;
+    });
+    await _persistTabs();
+    await _controller.loadRequest(Uri.parse(_tabs[_activeTabIndex]));
   }
 
   Future<void> _loadRules() async {
@@ -245,23 +349,17 @@ class _BrowserScreenState extends State<BrowserScreen> {
       return;
     }
     try {
-      final raw = await _controller
-          .runJavaScriptReturningResult('document.documentElement.outerHTML');
-      final bytes = Uint8List.fromList(utf8.encode(_extractString(raw)));
-      final host = Uri.parse(_currentUrl!).host;
-      final book = await compute(
-        BookParser.parse,
-        BookInput('page.html', bytes, host),
-      );
-      final title = (book.title.trim().isEmpty || book.title == 'Untitled')
-          ? host
-          : book.title;
-      final dir = await getApplicationDocumentsDirectory();
-      final dest = p.join(
-          dir.path, 'book_${DateTime.now().millisecondsSinceEpoch}.html');
-      await File(dest).writeAsBytes(bytes);
-      await LibraryDB.insert(dest, title, host, null);
-      _snack('Saved to your library');
+      final url = _currentUrl!;
+      final host = Uri.parse(url).host;
+      var title = host.isEmpty ? url : host;
+      try {
+        final rawTitle =
+            await _controller.runJavaScriptReturningResult('document.title');
+        final pageTitle = _extractString(rawTitle).trim();
+        if (pageTitle.isNotEmpty) title = pageTitle;
+      } catch (_) {}
+      await LibraryDB.insert(url, title, host, null);
+      _snack('Webpage link saved to your library');
     } catch (e) {
       _snack('Could not save this page: $e');
     }
@@ -285,6 +383,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (uri == null || uri.host.isEmpty) {
       uri = Uri.parse('https://duckduckgo.com/?q=${Uri.encodeComponent(q)}');
     }
+    if (_tabsReady && _tabs.isNotEmpty) {
+      _tabs[_activeTabIndex] = uri.toString();
+      _persistTabs();
+    }
     _controller.loadRequest(uri);
   }
 
@@ -306,6 +408,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   @override
   void dispose() {
     _speech.removeListener(_onSpeechChanged);
+    _persistTabs();
     _urlController.dispose();
     super.dispose();
   }
@@ -322,6 +425,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
         if (didPop) return;
         if (await _controller.canGoBack()) {
           await _controller.goBack();
+        } else if (_tabs.length > 1) {
+          await _closeTab(_activeTabIndex);
         } else if (mounted) {
           Navigator.of(context).pop();
         }
@@ -368,6 +473,43 @@ class _BrowserScreenState extends State<BrowserScreen> {
         body: Column(
           children: [
             if (_loading) const LinearProgressIndicator(minHeight: 2),
+            if (_tabsReady)
+              SizedBox(
+                height: 48,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _tabs.length,
+                        itemBuilder: (context, index) {
+                          final tabUri = Uri.tryParse(_tabs[index]);
+                          final label = tabUri?.host.isNotEmpty == true
+                              ? tabUri!.host
+                              : _tabs[index];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+                            child: InputChip(
+                              label: SizedBox(
+                                width: 105,
+                                child: Text(label, overflow: TextOverflow.ellipsis),
+                              ),
+                              selected: index == _activeTabIndex,
+                              onPressed: () => _selectTab(index),
+                              onDeleted: () => _closeTab(index),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'New tab',
+                      onPressed: () => _addTab(),
+                      icon: const Icon(Icons.add),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(child: WebViewWidget(controller: _controller)),
             SafeArea(
               top: false,

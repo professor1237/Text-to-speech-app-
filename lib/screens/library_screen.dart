@@ -132,14 +132,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (speech.owner == path) await speech.stop();
 
     await LibraryDB.delete(b['id'] as int);
-    try {
-      final f = File(path);
-      if (await f.exists()) await f.delete();
-    } catch (_) {}
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('pos_$path');
-    } catch (_) {}
+    final uri = Uri.tryParse(path);
+    final isWebUrl = uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+    if (!isWebUrl) {
+      try {
+        final f = File(path);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('pos_$path');
+      } catch (_) {}
+    }
     await _refresh();
   }
 
@@ -241,15 +247,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 ),
                                 title: Text(b['title'] ?? 'Untitled'),
                                 subtitle: Text(b['author'] ?? ''),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ReaderScreen(
-                                      filePath: b['path'] as String,
-                                      title: b['title'] as String? ?? 'Untitled',
+                                onTap: () {
+                                  final savedPath = b['path'] as String;
+                                  final uri = Uri.tryParse(savedPath);
+                                  final isWebUrl = uri != null &&
+                                      (uri.scheme == 'http' || uri.scheme == 'https') &&
+                                      uri.host.isNotEmpty;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => isWebUrl
+                                          ? BrowserScreen(
+                                              initialUrl: savedPath,
+                                              openInNewTab: true,
+                                            )
+                                          : ReaderScreen(
+                                              filePath: savedPath,
+                                              title: b['title'] as String? ?? 'Untitled',
+                                            ),
                                     ),
-                                  ),
-                                ),
+                                  ).then((_) => _refresh());
+                                },
                                 onLongPress: () => _confirmDelete(b),
                               );
                             },
