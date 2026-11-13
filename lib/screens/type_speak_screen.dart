@@ -23,6 +23,7 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
 
   final _speech = SpeechController.instance;
   final _controller = TextEditingController();
+  String? _queuedText;
 
   @override
   void initState() {
@@ -76,14 +77,15 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
   }
 
   Future<void> _play({bool forceNew = false}) async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
     if (!forceNew &&
         _speech.state == SpeechState.paused &&
-        _mine) {
+        _mine &&
+        text == _queuedText) {
       await _speech.resume();
       return;
     }
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
     FocusScope.of(context).unfocus();
 
     final queue = <SentenceRef>[];
@@ -97,6 +99,7 @@ class _TypeSpeakScreenState extends State<TypeSpeakScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     final rules = decodeRules(prefs.getString('term_rules'));
+    _queuedText = text;
     audioHandler.updateMediaItem(const MediaItem(
       id: _owner,
       title: 'Typed text',
