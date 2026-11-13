@@ -18,7 +18,6 @@ import '../widgets/paragraph_view.dart';
 import 'search_dialog.dart';
 import 'settings_sheet.dart';
 import 'terms_screen.dart';
-import 'voice_sheet.dart';
 
 /// What the background worker needs.
 class _LoadRequest {
@@ -71,7 +70,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
   int _lastChapter = -1;
   int _lastBlock = -1;
   String? _error;
-  double _speed = 0.5;
   String? _lastShownSpeechError;
 
   String get _posKey => 'pos_${widget.filePath}';
@@ -83,6 +81,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (_speech.owner != widget.filePath) _speech.stop();
     _speech.addListener(_onSpeechChanged);
     SettingsService.fontScale.addListener(_onSettingsChanged);
+    SettingsService.readerTextColor.addListener(_onSettingsChanged);
+    SettingsService.readerBackgroundColor.addListener(_onSettingsChanged);
     _load();
   }
 
@@ -90,6 +90,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void dispose() {
     _speech.removeListener(_onSpeechChanged);
     SettingsService.fontScale.removeListener(_onSettingsChanged);
+    SettingsService.readerTextColor.removeListener(_onSettingsChanged);
+    SettingsService.readerBackgroundColor.removeListener(_onSettingsChanged);
     super.dispose();
   }
 
@@ -102,7 +104,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _load() async {
     try {
       await _speech.initialize();
-      if (mounted) setState(() => _speed = _speech.rate);
       // Heavy work runs in the background so the app never freezes.
       final loaded = await compute(
         _loadBookInBackground,
@@ -304,7 +305,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   TextStyle _styleFor(BlockType t) {
     final scale = SettingsService.fontScale.value;
-    final base = TextStyle(fontSize: 18 * scale, height: 1.55);
+    final base = TextStyle(
+      fontSize: 18 * scale,
+      height: 1.55,
+      color: SettingsService.readerTextColor.value,
+    );
     switch (t) {
       case BlockType.heading:
         return base.copyWith(fontSize: 22 * scale, fontWeight: FontWeight.bold);
@@ -321,6 +326,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final active = _speech.isActive;
     final playing = _speech.isPlaying;
     return Scaffold(
+      backgroundColor: SettingsService.readerBackgroundColor.value,
       appBar: AppBar(
         title: Text(_book == null ? widget.title : _chapterTitle(_chapter)),
         actions: [
@@ -330,12 +336,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
             onPressed: _openSearch,
           ),
           IconButton(
-            icon: const Icon(Icons.record_voice_over),
-            tooltip: 'Voice and sleep timer',
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
             onPressed: () => showModalBottomSheet(
               context: context,
               isScrollControlled: true,
-              builder: (_) => const VoiceSheet(),
+              builder: (_) => const SettingsSheet(),
             ),
           ),
           IconButton(
@@ -386,88 +392,29 @@ class _ReaderScreenState extends State<ReaderScreen> {
           ? null
           : SafeArea(
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.skip_previous),
-                          iconSize: 32,
-                          tooltip: 'Previous sentence',
-                          onPressed: active ? () => _speech.skipPrev() : null,
-                        ),
-                        IconButton(
-                          icon: Icon(
-                              playing ? Icons.pause_circle : Icons.play_circle),
-                          iconSize: 40,
-                          tooltip: playing ? 'Pause' : 'Play',
-                          onPressed: _togglePlay,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.stop_circle),
-                          iconSize: 40,
-                          tooltip: 'Stop',
-                          onPressed: active ? () => _speech.stop() : null,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.skip_next),
-                          iconSize: 32,
-                          tooltip: 'Next sentence',
-                          onPressed: active ? () => _speech.skipNext() : null,
-                        ),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.skip_previous),
+                      iconSize: 32,
+                      tooltip: 'Previous sentence',
+                      onPressed: active ? () => _speech.skipPrev() : null,
                     ),
-                    Row(
-                      children: [
-                        const Icon(Icons.speed, size: 20),
-                        Expanded(
-                          child: Slider(
-                            value: _speed,
-                            min: 0.1,
-                            max: 2.0,
-                            divisions: 19,
-                            label: '${(_speed * 100).round()}%',
-                            onChanged: (v) {
-                              setState(() => _speed = v);
-                              _speech.setRate(v);
-                            },
-                          ),
-                        ),
-                      ],
+                    IconButton(
+                      icon: Icon(
+                          playing ? Icons.pause_circle : Icons.play_circle),
+                      iconSize: 44,
+                      tooltip: playing ? 'Pause' : 'Play',
+                      onPressed: _togglePlay,
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.text_decrease),
-                          iconSize: 28,
-                          tooltip: 'Smaller text',
-                          onPressed: () => SettingsService.setFontScale(
-                              SettingsService.fontScale.value - 0.1),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.text_increase),
-                          iconSize: 28,
-                          tooltip: 'Larger text',
-                          onPressed: () => SettingsService.setFontScale(
-                              SettingsService.fontScale.value + 0.1),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.palette),
-                          iconSize: 28,
-                          tooltip: 'Appearance',
-                          onPressed: () => showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            builder: (_) => const SettingsSheet(),
-                          ),
-                        ),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.skip_next),
+                      iconSize: 32,
+                      tooltip: 'Next sentence',
+                      onPressed: active ? () => _speech.skipNext() : null,
                     ),
                   ],
                 ),
