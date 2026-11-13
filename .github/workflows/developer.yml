@@ -21,21 +21,17 @@ jobs:
     timeout-minutes: 30
 
     steps:
-
-      # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -43,15 +39,15 @@ jobs:
           cache: true
           pub-cache: true
 
-      # 4. Gradle caching
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # 5. Install dependencies
       - name: Install Dependencies
         run: flutter pub get
 
-      # 6. Prepare your permanent signing key
+      - name: Run Flutter tests
+        run: flutter test
+
       - name: Prepare signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -65,39 +61,32 @@ jobs:
           echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           echo "KEYSTORE_PASSWORD=$KS_PASS" >> "$GITHUB_ENV"
 
-      # 7. Build ARM64 APK
       - name: Build Release APK
         run: |
           flutter build apk \
             --release \
             --target-platform android-arm64
 
-      # 8. Verify APK
       - name: Verify APK
         run: |
           APK="build/app/outputs/flutter-apk/app-release.apk"
-
           if [ ! -f "$APK" ]; then
             echo "APK not found!"
             exit 1
           fi
-
           echo "APK successfully generated:"
           ls -lh "$APK"
 
-      # 9. Update Developer tag
       - name: Update Developer Tag
         run: |
           git tag -f developer "$GITHUB_SHA"
           git push --force origin refs/tags/developer
 
-      # 10. Publish Developer Release
       - name: Update Developer Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: developer
           name: Developer Build
-
           body: |
             # Developer Version
 
@@ -106,9 +95,7 @@ jobs:
             Commit: ${{ github.sha }}
 
             This is a testing release.
-
           files: |
             build/app/outputs/flutter-apk/app-release.apk
-
           overwrite_files: true
           fail_on_unmatched_files: true

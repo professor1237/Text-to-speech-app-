@@ -24,6 +24,7 @@ class SpeechController extends ChangeNotifier {
   int _index = -1;
   int _generation = 0; // bumped on every speak/pause/stop; kills old loops
   bool _ready = false;
+  Future<void>? _initializing;
   double _rate = 0.5;
   SpeechState _state = SpeechState.stopped;
 
@@ -40,12 +41,20 @@ class SpeechController extends ChangeNotifier {
   SentenceRef? get current =>
       (_index >= 0 && _index < _queue.length) ? _queue[_index] : null;
 
-  Future<void> _init() async {
-    if (_ready) return;
-    await tts.awaitSpeakCompletion(true);
-    await tts.setSpeechRate(_rate);
-    await VoiceService.applySaved(tts); // saved pitch, voice and engine
-    _ready = true;
+  Future<void> _init() {
+    if (_ready) return Future<void>.value();
+    return _initializing ??= _initialize();
+  }
+
+  Future<void> _initialize() async {
+    try {
+      await tts.awaitSpeakCompletion(true);
+      await tts.setSpeechRate(_rate);
+      await VoiceService.applySaved(tts); // saved pitch, voice and engine
+      _ready = true;
+    } finally {
+      _initializing = null;
+    }
   }
 
   void _setState(SpeechState s) {
@@ -95,13 +104,29 @@ class SpeechController extends ChangeNotifier {
     List<TermRule> rules, {
     String? owner,
   }) async {
-    await _init();
+    // Invalidate older playback before awaiting initialization. Otherwise a
+    // Stop pressed during first-time TTS setup could be overtaken by this call.
     final gen = ++_generation;
+    try {
+      await _init();
+    } catch (_) {
+      if (gen == _generation) {
+        _index = -1;
+        _setState(SpeechState.stopped);
+      }
+      return;
+    }
+    if (gen != _generation) return;
+
     try {
       await tts.stop();
     } catch (_) {}
-    if (gen != _generation) return; // a newer call took over
-    if (queue.isEmpty || start < 0 || start >= queue.length) return;
+    if (gen != _generation) return;
+    if (queue.isEmpty || start < 0 || start >= queue.length) {
+      _index = -1;
+      _setState(SpeechState.stopped);
+      return;
+    }
 
     _queue = queue;
     _rules = rules;
