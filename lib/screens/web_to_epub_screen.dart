@@ -165,7 +165,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
                   value: profile.mode,
                   decoration: const InputDecoration(labelText: 'Download method', border: OutlineInputBorder()),
                   items: const [
-                    DropdownMenuItem(value: WebEpubDownloadMode.adaptive, child: Text('Adaptive parallel')),
+                    DropdownMenuItem(value: WebEpubDownloadMode.parallel, child: Text('Parallel chapters')),
                     DropdownMenuItem(value: WebEpubDownloadMode.parallel, child: Text('Parallel')),
                     DropdownMenuItem(value: WebEpubDownloadMode.sequential, child: Text('One chapter at a time')),
                   ],
