@@ -13,7 +13,6 @@ import '../services/web_reader_service.dart';
 import 'terms_screen.dart';
 import 'settings_sheet.dart';
 import 'web_to_epub_screen.dart';
-import '../services/settings_service.dart';
 
 class BrowserScreen extends StatefulWidget {
   const BrowserScreen({super.key, this.initialUrl, this.openInNewTab = false});
@@ -99,7 +98,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
           try {
             await _controller.runJavaScript(WebReaderService.doubleTapScript);
           } catch (_) {}
-          await _applyReaderColors();
           if (_autoRead && !_pageReadDone) {
             _pageReadDone = true;
             await Future.delayed(const Duration(milliseconds: 500));
@@ -114,8 +112,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
         },
       ));
     _speech.addListener(_onSpeechChanged);
-    SettingsService.readerTextColor.addListener(_applyReaderColors);
-    SettingsService.readerBackgroundColor.addListener(_applyReaderColors);
     _loadRules();
     _restoreTabs();
   }
@@ -432,29 +428,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _applyReaderColors() async {
-    if (!_pageReady) return;
-    final textColor = '#${SettingsService.readerTextColor.value.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
-    final backgroundColor = '#${SettingsService.readerBackgroundColor.value.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
-    final script = '''
-      (function() {
-        var id = 'tts-reader-colors';
-        var style = document.getElementById(id);
-        if (!style) {
-          style = document.createElement('style');
-          style.id = id;
-          (document.head || document.documentElement).appendChild(style);
-        }
-        style.textContent =
-          'html, body, body * { background-color: $backgroundColor !important; }' +
-          'body, body * { color: $textColor !important; }';
-      })();
-    ''';
-    try {
-      await _controller.runJavaScript(script);
-    } catch (_) {}
-  }
-
   void _openSettings() {
     showModalBottomSheet(
       context: context,
@@ -466,8 +439,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
   @override
   void dispose() {
     _speech.removeListener(_onSpeechChanged);
-    SettingsService.readerTextColor.removeListener(_applyReaderColors);
-    SettingsService.readerBackgroundColor.removeListener(_applyReaderColors);
     _persistTabs();
     _urlController.dispose();
     super.dispose();
