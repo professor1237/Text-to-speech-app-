@@ -47,7 +47,7 @@ class ChapterDiscoveryService {
       for (final anchor in root.querySelectorAll('a[href]')) {
         if (found.length >= maxChapters) break;
         final href = anchor.attributes['href'];
-        final label = anchor.text.replaceAll(RegExp(r'\\s+'), ' ').trim();
+        final label = anchor.text.replaceAll(RegExp(r'\s+'), ' ').trim();
         if (href == null || label.length < 2) continue;
         final uri = page.resolve(href);
         if (!{'http', 'https'}.contains(uri.scheme) || uri.host != start.host) continue;
@@ -82,7 +82,7 @@ class ChapterDiscoveryService {
     for (final anchor in root.querySelectorAll('a[href]')) {
       if (found.length >= maxChapters) break;
       final href = anchor.attributes['href'];
-      final label = anchor.text.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      final label = anchor.text.replaceAll(RegExp(r'\s+'), ' ').trim();
       if (href == null || label.length < 2) continue;
       final uri = start.resolve(href);
       if (!{'http', 'https'}.contains(uri.scheme) || uri.host != start.host) continue;
@@ -99,7 +99,7 @@ class ChapterDiscoveryService {
     if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.css') ||
         path.endsWith('.js') || path.endsWith('.pdf')) return false;
     return _chapterHint.hasMatch(label) || _chapterHint.hasMatch(path) ||
-        _urlHint.hasMatch(path) || RegExp(r'^\\s*(?:#?\\d{1,4}|prologue|epilogue)\\b', caseSensitive: false).hasMatch(label);
+        _urlHint.hasMatch(path) || RegExp(r'^\s*(?:#?\\d{1,4}|prologue|epilogue)\\b', caseSensitive: false).hasMatch(label);
   }
 
   bool _isPagination(String label, String rel) =>
