@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   webview_flutter: ^4.7.0
+  http: ^1.2.2
   flutter_tts: ^4.2.0
   epubx: ^4.0.0
   html: ^0.15.4

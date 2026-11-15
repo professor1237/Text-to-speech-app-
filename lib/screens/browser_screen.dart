@@ -12,6 +12,7 @@ import '../services/speech_controller.dart';
 import '../services/web_reader_service.dart';
 import 'terms_screen.dart';
 import 'settings_sheet.dart';
+import 'web_to_epub_screen.dart';
 import '../services/settings_service.dart';
 
 class BrowserScreen extends StatefulWidget {
@@ -347,6 +348,36 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
   }
 
+  Future<void> _openWebToEpub() async {
+    if (!_pageReady || _currentUrl == null) {
+      _snack('Wait for the page to finish loading.');
+      return;
+    }
+    final url = _currentUrl!;
+    var title = url;
+    try {
+      final raw = await _controller.runJavaScriptReturningResult('document.title');
+      final value = _extractString(raw).trim();
+      if (value.isNotEmpty) title = value;
+    } catch (_) {}
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WebToEpubScreen(
+          url: url,
+          pageTitle: title,
+          webViewFallback: () async {
+            final raw = await _controller.runJavaScriptReturningResult(
+              'document.documentElement ? document.documentElement.outerHTML : ""',
+            );
+            return _extractString(raw);
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _saveToLibrary() async {
     if (!_pageReady || _currentUrl == null) {
       _snack('Wait for the page to finish loading.');
@@ -489,6 +520,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 switch (v) {
                   case 'save':
                     _saveToLibrary();
+                  case 'epub':
+                    _openWebToEpub();
                   case 'settings':
                     _openSettings();
                   case 'terms':
@@ -496,7 +529,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 }
               },
               itemBuilder: (_) => const [
-                PopupMenuItem(value: 'save', child: Text('Save to library')),
+                PopupMenuItem(value: 'save', child: Text('Save webpage link')),
+                PopupMenuItem(value: 'epub', child: Text('Download as EPUB')),
                 PopupMenuItem(
                     value: 'settings', child: Text('Settings')),
                 PopupMenuItem(value: 'terms', child: Text('Term replacement')),
