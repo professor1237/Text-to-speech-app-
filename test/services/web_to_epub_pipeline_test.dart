@@ -27,6 +27,23 @@ void main() {
       ]);
     });
 
+    test('finds chapter links outside the first article or main container', () {
+      final service = ChapterDiscoveryService();
+      final chapters = service.discoverFromHtml('''
+        <html><body>
+          <main><article><h1>Novel description</h1><p>About this novel</p></article></main>
+          <section class="chapter-list">
+            <a href="/novel/chapter-1">1.1 So it Begins~</a>
+            <a href="/novel/chapter-2">1.2 Not a System~</a>
+          </section>
+        </body></html>
+      ''', 'https://novelphoenix.com/novel/example');
+      service.close();
+      expect(chapters, hasLength(2));
+      expect(chapters.first.title, '1.1 So it Begins~');
+      expect(chapters.last.url, 'https://novelphoenix.com/novel/chapter-2');
+    });
+
     test('returns no chapters when the page has no chapter links', () {
       final service = ChapterDiscoveryService();
       final chapters = service.discoverFromHtml(
