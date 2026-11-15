@@ -1,6 +1,7 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import '../models/block.dart';
+import 'web_epub_settings_service.dart';
 
 /// Extracts readable blocks and safe inline formatting from chapter HTML.
 class WebContentParser {
@@ -20,7 +21,23 @@ class WebContentParser {
     final document = html_parser.parse(html);
     final root = _contentRoot(document);
     if (root == null) return const [];
-    for (final selector in _skip) {
+    final skip = [..._skip];
+    final options = WebEpubSettingsService.cleaning;
+    if (options['footnoteReferences'] == true) {
+      skip.addAll(['.footnote-ref', '.footnote-reference', 'a[role="doc-noteref"]', 'sup a[href*="footnote"]', 'a[href*="#fn"]']);
+    }
+    if (options['footnoteText'] == true) {
+      skip.addAll(['.footnotes', '.footnote', '.footnote-list', '[role="doc-footnote"]', 'li[id^="fn"]', 'div[id^="fn"]']);
+    }
+    if (options['endnotes'] == true) {
+      skip.addAll(['.endnotes', '#endnotes', '.endnote', '[role="doc-endnotes"]']);
+    }
+    if (options['advertisements'] == true) skip.addAll(['.ad', '.ads', '.advert', '[id*="advert"]', '[class*="banner"]']);
+    if (options['comments'] == true) skip.addAll(['.comment', '#comments', '[id*="comment"]']);
+    if (options['authorNotes'] == true) skip.addAll(['.author-note', '.author-notes', '.note-author']);
+    if (options['chapterNavigation'] == true) skip.addAll(['.chapter-nav', '.prev-next', '.pagination', '.next-chapter', '.prev-chapter']);
+    if (options['promotionalContent'] == true) skip.addAll(['.promo', '.promotion', '.recommendations', '.related-posts', '.social-share']);
+    for (final selector in skip) {
       for (final element in root.querySelectorAll(selector).toList()) {
         element.remove();
       }
