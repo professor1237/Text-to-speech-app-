@@ -243,7 +243,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
   }
 
   String _safeName(String value) {
-    final cleaned = value.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').replaceAll(RegExp(r'\\s+'), '_').trim();
+    final cleaned = value.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').replaceAll(RegExp(r'\s+'), '_').trim();
     final safe = cleaned.isEmpty ? 'web_book' : cleaned;
     return safe.substring(0, safe.length > 70 ? 70 : safe.length);
   }
