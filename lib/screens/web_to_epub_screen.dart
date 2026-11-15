@@ -31,6 +31,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
   late final ChapterDiscoveryService _discovery;
   late final ChapterFetchService _fetcher;
   late final WebViewFetchService _webView;
+  late final WebToEpubService _singlePageService;
   WebBookDraft? _draft;
   bool _discovering = false;
   bool _downloading = false;
@@ -52,6 +53,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     _discovery = ChapterDiscoveryService();
     _fetcher = ChapterFetchService();
     _webView = WebViewFetchService();
+    _singlePageService = WebToEpubService();
   }
 
   @override
@@ -60,6 +62,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     _author.dispose();
     _discovery.close();
     _fetcher.close();
+    _singlePageService.close();
     super.dispose();
   }
 
@@ -85,6 +88,42 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
       ));
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _discovering = false);
+    }
+  }
+
+
+  /// Retains the original first-milestone behavior when a site has no
+  /// discoverable table of contents or the user only wants the open page.
+  Future<void> _createCurrentPage() async {
+    if (_discovering || _downloading) return;
+    setState(() { _discovering = true; _error = null; _epubPath = null; });
+    String? output;
+    try {
+      final page = await _singlePageService.extractCurrentPage(
+        url: widget.url,
+        pageTitle: _title.text,
+        webViewFallback: widget.webViewFallback,
+      );
+      final book = BookContent(
+        _title.text.trim().isEmpty ? page.title : _title.text.trim(),
+        _author.text.trim().isEmpty ? page.author : _author.text.trim(),
+        null,
+        [Chapter(page.title, page.blocks)],
+      );
+      final bytes = EpubWriterService.write(book);
+      final parsed = await EpubService.parse(bytes);
+      if (parsed.chapters.length != 1) throw Exception('Single-page EPUB validation failed.');
+      final dir = await getApplicationDocumentsDirectory();
+      output = p.join(dir.path, 'web_${DateTime.now().microsecondsSinceEpoch}_${_safeName(book.title)}.epub');
+      await File(output).writeAsBytes(bytes, flush: true);
+      if (mounted) setState(() => _epubPath = output);
+    } catch (e) {
+      if (output != null) {
+        try { final file = File(output); if (await file.exists()) await file.delete(); } catch (_) {}
+      }
+      if (mounted) setState(() => _error = 'Could not create EPUB from this page: $e');
     } finally {
       if (mounted) setState(() => _discovering = false);
     }
@@ -241,6 +280,11 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
             onPressed: _discovering || _downloading ? null : _discover,
             icon: const Icon(Icons.search),
             label: Text(draft == null ? 'Discover chapters' : 'Discover again'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _discovering || _downloading ? null : _createCurrentPage,
+            icon: const Icon(Icons.article),
+            label: const Text('Convert only this page'),
           ),
           if (_discovering) const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
