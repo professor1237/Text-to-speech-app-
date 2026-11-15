@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// Owns an isolated WebView controller so chapter fallback does not navigate
@@ -34,7 +35,15 @@ class WebViewFetchService {
     final raw = await controller.runJavaScriptReturningResult(
       'document.documentElement ? document.documentElement.outerHTML : ""',
     );
-    if (raw is String) return raw;
+    // Android returns the JS result JSON-encoded, so decode it.
+    if (raw is String) {
+      try {
+        final decoded = jsonDecode(raw);
+        return decoded is String ? decoded : raw;
+      } catch (_) {
+        return raw;
+      }
+    }
     return raw.toString();
   }
 }
