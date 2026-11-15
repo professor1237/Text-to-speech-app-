@@ -99,7 +99,7 @@ class ChapterDiscoveryService {
     if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.css') ||
         path.endsWith('.js') || path.endsWith('.pdf')) return false;
     return _chapterHint.hasMatch(label) || _chapterHint.hasMatch(path) ||
-        _urlHint.hasMatch(path) || RegExp(r'^\s*(?:#?\\d{1,4}|prologue|epilogue)\\b', caseSensitive: false).hasMatch(label);
+        _urlHint.hasMatch(path) || RegExp(r'^\s*(?:#?\d{1,4}|prologue|epilogue)\b', caseSensitive: false).hasMatch(label);
   }
 
   bool _isPagination(String label, String rel) =>
