@@ -70,6 +70,30 @@ class ChapterDiscoveryService {
     return found.values.toList();
   }
 
+
+  /// Parses a JavaScript-rendered TOC already loaded in the user's browser.
+  List<WebChapter> discoverFromHtml(String html, String sourceUrl, {int maxChapters = 500}) {
+    final start = Uri.parse(sourceUrl);
+    final document = html_parser.parse(html);
+    final root = document.querySelector('article, main, [role="main"], .toc, .chapter-list, .list-chapter') ??
+        document.body ?? document.documentElement;
+    if (root == null) return [];
+    final found = <String, WebChapter>{};
+    for (final anchor in root.querySelectorAll('a[href]')) {
+      if (found.length >= maxChapters) break;
+      final href = anchor.attributes['href'];
+      final label = anchor.text.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      if (href == null || label.length < 2) continue;
+      final uri = start.resolve(href);
+      if (!{'http', 'https'}.contains(uri.scheme) || uri.host != start.host) continue;
+      if (!_looksLikeChapter(label, uri)) continue;
+      found.putIfAbsent(uri.toString(), () => WebChapter(
+        title: label, url: uri.toString(), order: found.length,
+      ));
+    }
+    return found.values.toList();
+  }
+
   bool _looksLikeChapter(String label, Uri uri) {
     final path = uri.path.toLowerCase();
     if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.css') ||
