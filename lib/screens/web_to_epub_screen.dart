@@ -64,7 +64,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
       if (parsed.chapters.isEmpty) throw Exception('Generated EPUB validation failed.');
 
       final dir = await getApplicationDocumentsDirectory();
-      output = p.join(dir.path, 'web_\${DateTime.now().microsecondsSinceEpoch}_\${_safeName(book.title)}.epub');
+      output = p.join(dir.path, 'web_${DateTime.now().microsecondsSinceEpoch}_${_safeName(book.title)}.epub');
       await File(output).writeAsBytes(bytes, flush: true);
       if (!mounted) return;
       setState(() { _path = output; _method = page.method; });
@@ -98,11 +98,12 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     final path = _path;
     if (path == null) return;
     try {
-      await FilePicker.platform.saveFile(
+      final destination = await FilePicker.platform.saveFile(
         dialogTitle: 'Export EPUB',
-        fileName: '\${_safeName(_title.text)}.epub',
+        fileName: '${_safeName(_title.text)}.epub',
         bytes: await File(path).readAsBytes(),
       );
+      if (destination == null) return;
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not export EPUB: $e')),
