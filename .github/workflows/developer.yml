@@ -120,6 +120,8 @@ jobs:
           prerelease: true
           overwrite_files: true
           fail_on_unmatched_files: true
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
           body: |
             # Developer Version
 
@@ -137,6 +139,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_ID="$(gh api repos/${GITHUB_REPOSITORY}/releases/tags/developer --jq .id)"
+          RELEASE_ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '[.[] | select(.tag_name == "developer" and .draft == true)][0].id')"
+          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
+            echo "Draft developer release not found."
+            exit 1
+          fi
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false >/dev/null
           echo "Published APK and GitHub-generated source archives for $BUILD_SHA."
