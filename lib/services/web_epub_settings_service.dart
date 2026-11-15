@@ -42,9 +42,9 @@ class WebEpubSiteProfile {
         (v) => v.name == modeName,
         orElse: () => WebEpubDownloadMode.adaptive,
       ),
-      maxParallel: (json['maxParallel'] as num?)?.toInt().clamp(1, 10) ?? 3,
-      delaySeconds: (json['delaySeconds'] as num?)?.toInt().clamp(0, 30) ?? 0,
-      retries: (json['retries'] as num?)?.toInt().clamp(0, 5) ?? 2,
+      maxParallel: (json['maxParallel'] as num?)?.toInt().clamp(1, 10).toInt() ?? 3,
+      delaySeconds: (json['delaySeconds'] as num?)?.toInt().clamp(0, 30).toInt() ?? 0,
+      retries: (json['retries'] as num?)?.toInt().clamp(0, 5).toInt() ?? 2,
     );
   }
 }
