@@ -38,11 +38,10 @@ class ChapterDiscoveryService {
         continue;
       }
       final document = html_parser.parse(response.body);
-      final root = document.querySelector('article, main, [role="main"], .toc, .chapter-list, .list-chapter') ??
-          document.body ?? document.documentElement;
-      if (root == null) continue;
-
-      for (final anchor in root.querySelectorAll('a[href]')) {
+      // Chapter lists are often outside article/main (which may contain only
+      // the novel description). Scan the whole document and let URL/title
+      // heuristics filter unrelated navigation links.
+      for (final anchor in document.querySelectorAll('a[href]')) {
         if (found.length >= maxChapters) break;
         final href = anchor.attributes['href'];
         final label = anchor.text.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -73,17 +72,16 @@ class ChapterDiscoveryService {
   List<WebChapter> discoverFromHtml(String html, String sourceUrl, {int maxChapters = 500}) {
     final start = Uri.parse(sourceUrl);
     final document = html_parser.parse(html);
-    final root = document.querySelector('article, main, [role="main"], .toc, .chapter-list, .list-chapter') ??
-        document.body ?? document.documentElement;
-    if (root == null) return [];
+    // Inspect the entire rendered DOM: the TOC may be a sibling of article/main.
     final found = <String, WebChapter>{};
-    for (final anchor in root.querySelectorAll('a[href]')) {
+    for (final anchor in document.querySelectorAll('a[href]')) {
       if (found.length >= maxChapters) break;
       final href = anchor.attributes['href'];
       final label = anchor.text.replaceAll(RegExp(r'\s+'), ' ').trim();
       if (href == null || label.length < 2) continue;
       final uri = start.resolve(href);
       if (!{'http', 'https'}.contains(uri.scheme) || uri.host != start.host) continue;
+      if (_isPagination(label, anchor.attributes['rel'] ?? '')) continue;
       if (!_looksLikeChapter(label, uri)) continue;
       found.putIfAbsent(uri.toString(), () => WebChapter(
         title: label, url: uri.toString(), order: found.length,
