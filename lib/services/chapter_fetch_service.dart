@@ -1,6 +1,5 @@
 import 'package:http/http.dart' as http;
 import '../models/block.dart';
-import 'web_epub_settings_service.dart';
 import 'web_content_parser.dart';
 
 typedef ChapterWebViewFallback = Future<String> Function(Uri uri);
@@ -21,7 +20,6 @@ class ChapterFetchService {
     required ChapterWebViewFallback webViewFallback,
     int retries = 0,
   }) async {
-    final profile = WebEpubSettingsService.forUri(uri);
     final attempts = retries.clamp(0, 5) + 1;
     for (var attempt = 0; attempt < attempts; attempt++) {
       try {
