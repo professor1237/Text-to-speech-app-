@@ -87,6 +87,14 @@ class WebContentParser {
         }
       }
     }
+    if (options['duplicateParagraphs'] == true) {
+      final seen = <String>{};
+      blocks.removeWhere((block) {
+        final key = _clean(block.text).toLowerCase();
+        if (key.length < 30) return false;
+        return !seen.add(key);
+      });
+    }
     return blocks;
   }
 
