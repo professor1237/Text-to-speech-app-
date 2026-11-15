@@ -245,7 +245,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     final profile = WebEpubSettingsService.forUri(Uri.parse(widget.url));
     final workers = profile.mode == WebEpubDownloadMode.sequential
         ? 1
-        : profile.maxParallel.clamp(1, 10);
+        : profile.maxParallel;
     var nextIndex = 0;
     Future<void> worker() async {
       while (true) {
