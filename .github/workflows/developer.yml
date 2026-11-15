@@ -139,9 +139,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '[.[] | select(.tag_name == "developer" and .draft == true)][0].id')"
-          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
-            echo "Draft developer release not found."
+          # Resolve the release by its tag through GitHub CLI. The releases
+          # collection can omit a just-created draft due to API consistency
+          # timing, which previously produced a false 404 at publish time.
+          RELEASE_ID="$(gh release view developer --json databaseId --jq .databaseId)"
+          if ! [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]; then
+            echo "Could not resolve the developer release ID for tag 'developer'."
             exit 1
           fi
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false >/dev/null
