@@ -111,6 +111,7 @@ jobs:
       # GitHub generates Source code (zip) and Source code (tar.gz) from this tag.
       # The draft remains unpublished until the APK has uploaded successfully.
       - name: Create draft Developer Release and upload APK
+        id: create_release
         if: steps.latest_check.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
@@ -142,9 +143,9 @@ jobs:
           # Resolve the release by its tag through GitHub CLI. The releases
           # collection can omit a just-created draft due to API consistency
           # timing, which previously produced a false 404 at publish time.
-          RELEASE_ID="$(gh release view developer --json databaseId --jq .databaseId)"
+          RELEASE_ID="${{ steps.create_release.outputs.id }}"
           if ! [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]; then
-            echo "Could not resolve the developer release ID for tag 'developer'."
+            echo "The release action did not return a valid release ID."
             exit 1
           fi
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false >/dev/null
