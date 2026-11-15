@@ -9,7 +9,8 @@ class EpubWriterService {
   static Uint8List write(BookContent book) {
     if (book.chapters.isEmpty) throw ArgumentError('An EPUB needs at least one chapter.');
     final archive = Archive();
-    final bookId = 'urn:uuid:${DateTime.now().toUtc().microsecondsSinceEpoch}';
+    final suffix = DateTime.now().toUtc().microsecondsSinceEpoch.toRadixString(16).padLeft(12, '0');
+    final bookId = 'urn:uuid:00000000-0000-4000-8000-${suffix.substring(suffix.length - 12)}';
     final mime = utf8.encode('application/epub+zip');
     final mimeFile = ArchiveFile('mimetype', mime.length, mime)..compress = false;
     archive.addFile(mimeFile);
