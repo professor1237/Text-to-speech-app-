@@ -246,13 +246,22 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
         ? 1
         : profile.maxParallel;
     var nextIndex = 0;
+    var nextChapterStart = DateTime.now();
     Future<void> worker() async {
       while (true) {
         if (!mounted || nextIndex >= targets.length) return;
         final index = nextIndex++;
         final chapter = targets[index];
-        if (profile.delaySeconds > 0 && index > 0) {
-          await Future<void>.delayed(Duration(seconds: profile.delaySeconds));
+
+        // Reserve each chapter's start time synchronously so parallel workers
+        // cannot all wake up together after the same delay.
+        final scheduledStart = nextChapterStart;
+        nextChapterStart = scheduledStart.add(
+          Duration(seconds: profile.delaySeconds),
+        );
+        final wait = scheduledStart.difference(DateTime.now());
+        if (wait > Duration.zero) {
+          await Future<void>.delayed(wait);
         }
         if (!mounted) return;
         setState(() { chapter.status = ChapterDownloadStatus.downloading; chapter.error = null; });
