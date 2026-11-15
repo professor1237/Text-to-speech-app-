@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum WebEpubDownloadMode { adaptive, parallel, sequential }
+enum WebEpubDownloadMode { parallel, sequential }
 
 class WebEpubSiteProfile {
   const WebEpubSiteProfile({
-    this.mode = WebEpubDownloadMode.adaptive,
+    this.mode = WebEpubDownloadMode.parallel,
     this.maxParallel = 3,
     this.delaySeconds = 0,
     this.retries = 2,
@@ -40,7 +40,7 @@ class WebEpubSiteProfile {
     return WebEpubSiteProfile(
       mode: WebEpubDownloadMode.values.firstWhere(
         (v) => v.name == modeName,
-        orElse: () => WebEpubDownloadMode.adaptive,
+        orElse: () => WebEpubDownloadMode.parallel,
       ),
       maxParallel: (json['maxParallel'] as num?)?.toInt().clamp(1, 10).toInt() ?? 3,
       delaySeconds: (json['delaySeconds'] as num?)?.toInt().clamp(0, 30).toInt() ?? 0,
