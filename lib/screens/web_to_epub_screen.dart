@@ -71,14 +71,30 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     if (_discovering || _downloading) return;
     setState(() { _discovering = true; _error = null; _draft = null; _epubPath = null; });
     try {
-      List<WebChapter> chapters;
+      // Merge links from the raw HTTP response and the active, rendered
+      // WebView. Some sites return a partial/non-empty HTTP page while their
+      // actual chapter list is inserted by JavaScript.
+      final discovered = <String, WebChapter>{};
       try {
-        chapters = await _discovery.discover(widget.url);
-      } catch (httpError) {
-        // The currently displayed page may contain a JavaScript-rendered TOC.
+        final httpChapters = await _discovery.discover(widget.url);
+        for (final chapter in httpChapters) {
+          discovered.putIfAbsent(chapter.url, () => chapter);
+        }
+      } catch (_) {
+        // Continue with the rendered DOM; it may contain the client-side TOC.
+      }
+      try {
         final html = await widget.webViewFallback();
-        chapters = _discovery.discoverFromHtml(html, widget.url);
-        if (chapters.isEmpty) rethrow;
+        final renderedChapters = _discovery.discoverFromHtml(html, widget.url);
+        for (final chapter in renderedChapters) {
+          discovered.putIfAbsent(chapter.url, () => chapter);
+        }
+      } catch (_) {
+        // Preserve HTTP results if the WebView snapshot is unavailable.
+      }
+      final chapters = discovered.values.toList();
+      if (chapters.isEmpty) {
+        throw Exception('No chapter links were detected in the page. Open the novel table of contents and try again.');
       }
       if (!mounted) return;
       setState(() => _draft = WebBookDraft(
