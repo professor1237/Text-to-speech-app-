@@ -38,8 +38,6 @@ class ChapterDiscoveryService {
         continue;
       }
       final document = html_parser.parse(response.body);
-      final title = document.querySelector('h1')?.text.trim() ??
-          document.querySelector('title')?.text.trim() ?? 'Chapter';
       final root = document.querySelector('article, main, [role="main"], .toc, .chapter-list, .list-chapter') ??
           document.body ?? document.documentElement;
       if (root == null) continue;
