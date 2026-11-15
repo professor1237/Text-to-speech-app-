@@ -13,6 +13,7 @@ import '../services/epub_writer_service.dart';
 import '../services/library_db.dart';
 import '../services/web_to_epub_service.dart';
 import '../services/webview_fetch_service.dart';
+import '../services/web_epub_settings_service.dart';
 
 class WebToEpubScreen extends StatefulWidget {
   const WebToEpubScreen({
@@ -146,6 +147,82 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     }
   }
 
+  Future<void> _openDownloadSettings() async {
+    final host = Uri.parse(widget.url).host.toLowerCase();
+    var profile = WebEpubSettingsService.forUri(Uri.parse(widget.url));
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Download settings · $host', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<WebEpubDownloadMode>(
+                  value: profile.mode,
+                  decoration: const InputDecoration(labelText: 'Download method', border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: WebEpubDownloadMode.parallel, child: Text('Parallel chapters')),
+                    DropdownMenuItem(value: WebEpubDownloadMode.sequential, child: Text('One chapter at a time')),
+                  ],
+                  onChanged: (value) => setSheetState(() => profile = profile.copyWith(mode: value)),
+                ),
+                const SizedBox(height: 12),
+                Text('Maximum parallel downloads: ${profile.maxParallel}'),
+                Slider(value: profile.maxParallel.toDouble(), min: 1, max: 8, divisions: 7, onChanged: (v) => setSheetState(() => profile = profile.copyWith(maxParallel: v.round()))),
+                Text('Delay between starting chapters: ${profile.delaySeconds} seconds'),
+                Slider(value: profile.delaySeconds.toDouble(), min: 0, max: 10, divisions: 10, onChanged: (v) => setSheetState(() => profile = profile.copyWith(delaySeconds: v.round()))),
+                Text('HTTP retries: ${profile.retries}'),
+                Slider(value: profile.retries.toDouble(), min: 0, max: 5, divisions: 5, onChanged: (v) => setSheetState(() => profile = profile.copyWith(retries: v.round()))),
+                const SizedBox(height: 8),
+                const Divider(),
+                Text('Chapter cleaning', style: Theme.of(context).textTheme.titleMedium),
+                ...[
+                  ('footnoteReferences', 'Remove footnote references'),
+                  ('footnoteText', 'Remove footnote text'),
+                  ('endnotes', 'Remove endnotes'),
+                  ('advertisements', 'Remove advertisements'),
+                  ('comments', 'Remove comments'),
+                  ('authorNotes', 'Remove author notes'),
+                  ('chapterNavigation', 'Remove chapter navigation'),
+                  ('promotionalContent', 'Remove promotional content'),
+                  ('duplicateParagraphs', 'Remove duplicate paragraphs'),
+                ].map((entry) => CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: WebEpubSettingsService.cleaning[entry.$1] ?? false,
+                  title: Text(entry.$2),
+                  onChanged: (value) async {
+                    await WebEpubSettingsService.saveCleaning(entry.$1, value ?? false);
+                    setSheetState(() {});
+                  },
+                )),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () async {
+                    await WebEpubSettingsService.saveSite(host, profile);
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  },
+                  child: const Text('Save settings for this website'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await WebEpubSettingsService.saveSite(host, const WebEpubSiteProfile());
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  },
+                  child: const Text('Reset this website'),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _download({bool retryOnly = false}) async {
     final draft = _draft;
     if (draft == null || _downloading) return;
@@ -164,27 +241,42 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
       _httpCount = 0;
       _webViewCount = 0;
     });
-    for (final chapter in targets) {
-      if (!mounted) break;
-      setState(() { chapter.status = ChapterDownloadStatus.downloading; chapter.error = null; });
-      try {
-        final result = await _fetcher.fetch(
-          Uri.parse(chapter.url),
-          webViewFallback: (uri) => _webView.fetch(uri),
-        );
-        chapter.blocks = result.blocks;
-        chapter.status = ChapterDownloadStatus.downloaded;
-        if (result.method == 'HTTP') {
-          _httpCount++;
-        } else {
-          _webViewCount++;
+    final profile = WebEpubSettingsService.forUri(Uri.parse(widget.url));
+    final workers = profile.mode == WebEpubDownloadMode.sequential
+        ? 1
+        : profile.maxParallel;
+    var nextIndex = 0;
+    Future<void> worker() async {
+      while (true) {
+        if (!mounted || nextIndex >= targets.length) return;
+        final index = nextIndex++;
+        final chapter = targets[index];
+        if (profile.delaySeconds > 0 && index > 0) {
+          await Future<void>.delayed(Duration(seconds: profile.delaySeconds));
         }
-      } catch (e) {
-        chapter.status = ChapterDownloadStatus.failed;
-        chapter.error = e.toString();
+        if (!mounted) return;
+        setState(() { chapter.status = ChapterDownloadStatus.downloading; chapter.error = null; });
+        try {
+          final result = await _fetcher.fetch(
+            Uri.parse(chapter.url),
+            webViewFallback: (uri) => _webView.fetch(uri),
+            retries: profile.retries,
+          );
+          chapter.blocks = result.blocks;
+          chapter.status = ChapterDownloadStatus.downloaded;
+          if (result.method == 'HTTP') {
+            _httpCount++;
+          } else {
+            _webViewCount++;
+          }
+        } catch (e) {
+          chapter.status = ChapterDownloadStatus.failed;
+          chapter.error = e.toString();
+        }
+        if (mounted) setState(() => _completed++);
       }
-      if (mounted) setState(() => _completed++);
     }
+    await Future.wait(List.generate(workers, (_) => worker()));
     if (mounted) setState(() => _downloading = false);
   }
 
@@ -305,6 +397,11 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
           const SizedBox(height: 10),
           Text('Table of contents: ${widget.url}', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _downloading ? null : _openDownloadSettings,
+            icon: const Icon(Icons.tune),
+            label: const Text('Download settings for this website'),
+          ),
           FilledButton.icon(
             onPressed: _discovering || _downloading ? null : _discover,
             icon: const Icon(Icons.search),

@@ -26,8 +26,15 @@ class WebViewFetchService {
 
   late final WebViewController controller;
   Completer<void>? _pending;
+  Future<void> _queue = Future<void>.value();
 
-  Future<String> fetch(Uri uri) async {
+  Future<String> fetch(Uri uri) {
+    final result = _queue.then((_) => _fetchOne(uri));
+    _queue = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
+  }
+
+  Future<String> _fetchOne(Uri uri) async {
     _pending = Completer<void>();
     await controller.loadRequest(uri);
     await _pending!.future.timeout(const Duration(seconds: 25));
@@ -35,7 +42,6 @@ class WebViewFetchService {
     final raw = await controller.runJavaScriptReturningResult(
       'document.documentElement ? document.documentElement.outerHTML : ""',
     );
-    // Android returns the JS result JSON-encoded, so decode it.
     if (raw is String) {
       try {
         final decoded = jsonDecode(raw);

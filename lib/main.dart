@@ -3,6 +3,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'services/settings_service.dart';
+import 'services/web_epub_settings_service.dart';
 import 'screens/library_screen.dart';
 import 'services/audio_handler.dart';
 
@@ -11,6 +12,7 @@ late AudioHandler audioHandler;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService.load();
+  await WebEpubSettingsService.load();
   final session = await AudioSession.instance;
   await session.configure(const AudioSessionConfiguration.speech());
   audioHandler = await AudioService.init(
