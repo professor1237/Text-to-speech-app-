@@ -91,7 +91,9 @@ class EpubWriterService {
   static String _chapter(Chapter chapter) {
     final body = <String>['<h1>${_e(chapter.title)}</h1>'];
     for (final block in chapter.blocks) {
-      final value = _e(block.text);
+      // markup is produced by WebContentParser's allow-list serializer. Legacy
+      // blocks have no markup and continue to be escaped as plain text.
+      final value = block.markup ?? _e(block.text);
       switch (block.type) {
         case BlockType.heading: body.add('<h2>$value</h2>'); break;
         case BlockType.listItem: body.add('<p class="list-item">$value</p>'); break;
