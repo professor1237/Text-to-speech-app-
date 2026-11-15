@@ -28,18 +28,6 @@ jobs:
       BUILD_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
 
     steps:
-      - name: Confirm tested commit is latest main
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          LATEST_MAIN_SHA="$(gh api repos/${GITHUB_REPOSITORY}/commits/main --jq .sha)"
-          echo "Build commit: $BUILD_SHA"
-          echo "Latest main:  $LATEST_MAIN_SHA"
-          if [ "$LATEST_MAIN_SHA" != "$BUILD_SHA" ]; then
-            echo "Skipping stale build; a newer main commit exists."
-            exit 0
-          fi
-
       - name: Checkout tested commit
         uses: actions/checkout@v4
         with:
@@ -149,5 +137,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release edit developer --draft=false
+          RELEASE_ID="$(gh api repos/${GITHUB_REPOSITORY}/releases/tags/developer --jq .id)"
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false >/dev/null
           echo "Published APK and GitHub-generated source archives for $BUILD_SHA."
