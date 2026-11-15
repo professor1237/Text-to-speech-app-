@@ -64,7 +64,7 @@ class WebContentParser {
     if (blocks.isEmpty) {
       final text = _clean(root.text);
       if (text.length >= 80) {
-        for (final part in text.split(RegExp(r'(?<=[.!?])\\s{2,}'))) {
+        for (final part in text.split(RegExp(r'(?<=[.!?])\s{2,}'))) {
           final value = _clean(part);
           if (value.length >= 2) blocks.add(Block(value, BlockType.paragraph));
         }
@@ -114,5 +114,5 @@ class WebContentParser {
   }
 
   static String _clean(String value) =>
-      value.replaceAll('\\u00a0', ' ').replaceAll(RegExp(r'\\s+'), ' ').trim();
+      value.replaceAll('\u00a0', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
 }
