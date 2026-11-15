@@ -37,7 +37,9 @@ class ChapterFetchService {
         // Retry HTTP before falling back to the site's rendered session.
       }
       if (attempt + 1 < attempts) {
-        await Future<void>.delayed(Duration(seconds: profile.delaySeconds > 0 ? profile.delaySeconds : 1));
+        // Retry backoff is independent of the user-configured delay between
+        // starting different chapters.
+        await Future<void>.delayed(Duration(seconds: 1 << attempt));
       }
     }
 
