@@ -162,7 +162,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
                 Text('Download settings · $host', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<WebEpubDownloadMode>(
-                  value: profile.mode,
+                  initialValue: profile.mode,
                   decoration: const InputDecoration(labelText: 'Download method', border: OutlineInputBorder()),
                   items: const [
                     DropdownMenuItem(value: WebEpubDownloadMode.parallel, child: Text('Parallel chapters')),
@@ -369,7 +369,6 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     final chapters = _draft?.chapters;
     if (chapters == null) return;
     setState(() {
-      if (newIndex > oldIndex) newIndex--;
       final item = chapters.removeAt(oldIndex);
       chapters.insert(newIndex, item);
       for (var i = 0; i < chapters.length; i++) { chapters[i].order = i; }
@@ -443,7 +442,7 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
               child: ReorderableListView.builder(
                 buildDefaultDragHandles: true,
                 itemCount: draft.chapters.length,
-                onReorder: _reorder,
+                onReorderItem: _reorder,
                 itemBuilder: (context, index) {
                   final chapter = draft.chapters[index];
                   final statusIcon = switch (chapter.status) {
