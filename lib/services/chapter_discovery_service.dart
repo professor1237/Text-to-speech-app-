@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
+import 'http_decode.dart';
 import '../models/web_chapter.dart';
 
 /// Discovers likely chapter links from a table-of-contents page.
@@ -37,7 +38,7 @@ class ChapterDiscoveryService {
         if (page == start) throw Exception('Could not load the table of contents (HTTP ${response.statusCode}).');
         continue;
       }
-      final document = html_parser.parse(response.body);
+      final document = html_parser.parse(decodeHtmlResponse(response));
       // Chapter lists are often outside article/main (which may contain only
       // the novel description). Scan the whole document and let URL/title
       // heuristics filter unrelated navigation links.
