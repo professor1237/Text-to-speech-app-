@@ -5,6 +5,7 @@ import 'package:tts_reader/services/chapter_discovery_service.dart';
 import 'package:tts_reader/services/epub_service.dart';
 import 'package:tts_reader/services/epub_writer_service.dart';
 import 'package:tts_reader/services/web_content_parser.dart';
+import 'package:tts_reader/services/web_epub_settings_service.dart';
 
 void main() {
   group('ChapterDiscoveryService', () {
@@ -83,6 +84,31 @@ void main() {
 
 
   group('WebContentParser', () {
+    test('footnote references and footnote text follow separate settings', () {
+      WebEpubSettingsService.cleaning['footnoteReferences'] = true;
+      WebEpubSettingsService.cleaning['footnoteText'] = false;
+      const html = '''
+        <html><body><article>
+          <p>This is a sufficiently long paragraph with a footnote marker
+          <sup><a href="#fn1" class="footnote-ref">1</a></sup> in the middle.</p>
+          <ol class="footnotes"><li id="fn1">This is the explanatory footnote text.</li></ol>
+          <p>This is another sufficiently long paragraph so the chapter is valid.</p>
+        </article></body></html>
+      ''';
+      var blocks = WebContentParser.parse(html);
+      expect(blocks.any((b) => b.text.contains('footnote marker 1')), isFalse);
+      expect(blocks.any((b) => b.text.contains('explanatory footnote text')), isTrue);
+
+      WebEpubSettingsService.cleaning['footnoteReferences'] = false;
+      WebEpubSettingsService.cleaning['footnoteText'] = true;
+      blocks = WebContentParser.parse(html);
+      expect(blocks.any((b) => b.text.contains('footnote marker 1')), isTrue);
+      expect(blocks.any((b) => b.text.contains('explanatory footnote text')), isFalse);
+
+      WebEpubSettingsService.cleaning['footnoteReferences'] = true;
+      WebEpubSettingsService.cleaning['footnoteText'] = false;
+    });
+
     test('preserves safe inline formatting and removes unsafe elements', () {
       final blocks = WebContentParser.parse('''
         <html><body><article>
