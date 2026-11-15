@@ -179,6 +179,29 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
                 Text('HTTP retries: ${profile.retries}'),
                 Slider(value: profile.retries.toDouble(), min: 0, max: 5, divisions: 5, onChanged: (v) => setSheetState(() => profile = profile.copyWith(retries: v.round()))),
                 const SizedBox(height: 8),
+                const Divider(),
+                Text('Chapter cleaning', style: Theme.of(context).textTheme.titleMedium),
+                ...[
+                  ('footnoteReferences', 'Remove footnote references'),
+                  ('footnoteText', 'Remove footnote text'),
+                  ('endnotes', 'Remove endnotes'),
+                  ('advertisements', 'Remove advertisements'),
+                  ('comments', 'Remove comments'),
+                  ('authorNotes', 'Remove author notes'),
+                  ('chapterNavigation', 'Remove chapter navigation'),
+                  ('promotionalContent', 'Remove promotional content'),
+                  ('duplicateParagraphs', 'Remove duplicate paragraphs'),
+                ].map((entry) => CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: WebEpubSettingsService.cleaning[entry.$1] ?? false,
+                  title: Text(entry.$2),
+                  onChanged: (value) async {
+                    await WebEpubSettingsService.saveCleaning(entry.$1, value ?? false);
+                    setSheetState(() {});
+                  },
+                )),
+                const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () async {
                     await WebEpubSettingsService.saveSite(host, profile);
