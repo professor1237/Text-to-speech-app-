@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../models/web_book_draft.dart';
 import '../models/web_chapter.dart';
 import '../services/chapter_discovery_service.dart';
@@ -267,9 +268,21 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
     final failed = draft?.chapters.where((c) => c.selected && c.status == ChapterDownloadStatus.failed).length ?? 0;
     return Scaffold(
       appBar: AppBar(title: const Text('WebToEpub')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Stack(
         children: [
+          // A WebViewController must be attached to a WebViewWidget before it
+          // can reliably load pages. Keep the fallback view mounted at a tiny
+          // size so chapter rendering works without replacing the browser tab.
+          Positioned(
+            left: 0,
+            top: 0,
+            width: 1,
+            height: 1,
+            child: WebViewWidget(controller: _webView.controller),
+          ),
+          ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           TextField(controller: _title, decoration: const InputDecoration(labelText: 'Book title', border: OutlineInputBorder())),
           const SizedBox(height: 10),
           TextField(controller: _author, decoration: const InputDecoration(labelText: 'Author', border: OutlineInputBorder())),
@@ -383,6 +396,8 @@ class _WebToEpubScreenState extends State<WebToEpubScreen> {
           ),
           const SizedBox(height: 16),
           Text('Some websites use JavaScript, login sessions, unusual navigation or access restrictions. Chapter discovery may need a site-specific adapter; inaccessible or incomplete chapters are reported rather than silently included.', style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
         ],
       ),
     );
