@@ -4,6 +4,7 @@ import 'package:tts_reader/models/web_chapter.dart';
 import 'package:tts_reader/services/chapter_discovery_service.dart';
 import 'package:tts_reader/services/epub_service.dart';
 import 'package:tts_reader/services/epub_writer_service.dart';
+import 'package:tts_reader/services/web_content_parser.dart';
 
 void main() {
   group('ChapterDiscoveryService', () {
@@ -60,6 +61,27 @@ void main() {
       expect(parsed.chapters, hasLength(2));
       expect(parsed.chapters.first.title, 'Chapter One');
       expect(parsed.chapters.last.title, 'Chapter Two');
+    });
+  });
+
+
+  group('WebContentParser', () {
+    test('preserves safe inline formatting and removes unsafe elements', () {
+      final blocks = WebContentParser.parse('''
+        <html><body><article>
+          <p>This is a sufficiently long chapter paragraph with
+          <strong>bold text</strong>, <em>italic text</em> and
+          <a href="https://example.com/source">a source link</a>.
+          <a href="javascript:alert(1)">unsafe link</a>
+          <script>secret()</script></p>
+        </article></body></html>
+      ''');
+      expect(blocks, hasLength(1));
+      expect(blocks.single.markup, contains('<strong>bold text</strong>'));
+      expect(blocks.single.markup, contains('<em>italic text</em>'));
+      expect(blocks.single.markup, contains('href="https://example.com/source"'));
+      expect(blocks.single.markup, isNot(contains('javascript:')));
+      expect(blocks.single.markup, isNot(contains('secret()')));
     });
   });
 
