@@ -1,4 +1,4 @@
-name: Build and Update Developer Release
+name: Build and Recreate Developer Release
 
 on:
   workflow_run:
@@ -80,14 +80,26 @@ jobs:
           echo "APK successfully generated:"
           ls -lh "$APK"
 
-      - name: Update Developer Tag
+      # Do not remove the working release until a new APK has built and passed verification.
+      - name: Delete Previous Developer Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view developer >/dev/null 2>&1; then
+            gh release delete developer --yes
+          else
+            echo "No previous developer release found."
+          fi
+
+      - name: Replace Developer Tag
         env:
           BUILD_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
         run: |
+          git push origin --delete developer || true
           git tag -f developer "$BUILD_SHA"
-          git push --force origin refs/tags/developer
+          git push origin refs/tags/developer
 
-      - name: Update Developer Release
+      - name: Create New Developer Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: developer
@@ -95,12 +107,11 @@ jobs:
           body: |
             # Developer Version
 
-            Automatically built after Flutter CI succeeds on main.
+            Fresh developer release created after a successful Flutter build.
 
             Commit: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
 
             This is a testing release.
           files: |
             build/app/outputs/flutter-apk/app-release.apk
-          overwrite_files: true
           fail_on_unmatched_files: true
