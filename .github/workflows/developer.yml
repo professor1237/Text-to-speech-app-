@@ -1,7 +1,11 @@
 name: Build and Update Developer Release
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - Flutter CI
+    types:
+      - completed
     branches:
       - main
 
@@ -17,13 +21,15 @@ concurrency:
 jobs:
   build:
     name: Build Android APK
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout tested commit
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Setup Java
@@ -44,9 +50,6 @@ jobs:
 
       - name: Install Dependencies
         run: flutter pub get
-
-      - name: Run Flutter tests
-        run: flutter test
 
       - name: Prepare signing key
         env:
@@ -78,8 +81,10 @@ jobs:
           ls -lh "$APK"
 
       - name: Update Developer Tag
+        env:
+          BUILD_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
         run: |
-          git tag -f developer "$GITHUB_SHA"
+          git tag -f developer "$BUILD_SHA"
           git push --force origin refs/tags/developer
 
       - name: Update Developer Release
@@ -90,9 +95,9 @@ jobs:
           body: |
             # Developer Version
 
-            Automatically updated from the latest main branch.
+            Automatically built after Flutter CI succeeds on main.
 
-            Commit: ${{ github.sha }}
+            Commit: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
 
             This is a testing release.
           files: |
