@@ -40,6 +40,14 @@ Scanned/image-only PDFs and password-protected files are not supported.
 ### Browser and typing
 - Open web pages in the in-app browser and listen with sentence highlighting.
 - Use browser navigation and save supported pages to the library.
+- Convert the currently open web page into an EPUB.
+- Discover chapter links from a novel's table of contents and combine chapters into one EPUB.
+- Select, deselect, and reorder chapters before downloading.
+- Fetch chapters over HTTP, with a rendered WebView fallback for JavaScript-driven or session-dependent pages.
+- Configure per-website download behavior: parallel or sequential downloads, maximum parallel workers, start delay, and HTTP retries.
+- Retry failed chapters or create an EPUB from successfully downloaded chapters only.
+- Configure web chapter cleanup, including footnote references/text, endnotes, advertisements, comments, author notes, chapter navigation, promotional content, and duplicate paragraphs.
+- Save the generated EPUB to the library or export it as a file.
 - Paste or type text in **Type & Speak** and listen to it.
 
 ### Voice, appearance, and sleep timer
@@ -67,9 +75,10 @@ flutter pub get
 flutter run
 ```
 
-Run the automated tests:
+Run static analysis and the automated tests:
 
 ```bash
+flutter analyze
 flutter test
 ```
 
@@ -96,12 +105,19 @@ lib/
     library_db.dart          SQLite library storage
     settings_service.dart    Theme and reading settings
     web_reader_service.dart  Web-page text extraction
+    web_content_parser.dart  HTML chapter text parsing and cleanup
+    chapter_discovery_service.dart  Table-of-contents chapter discovery
+    chapter_fetch_service.dart  HTTP chapter downloads and fallback
+    webview_fetch_service.dart  Serialized WebView chapter extraction
+    web_epub_settings_service.dart  Persistent per-site download and cleanup settings
+    web_to_epub_service.dart  Single-page web-to-EPUB extraction
     voice_service.dart       Voice, pitch, and engine settings
     sleep_timer.dart         Timed playback pause
   screens/
     library_screen.dart      Library and file import
     reader_screen.dart       Book reading and playback
     browser_screen.dart      In-app browser reader
+    web_to_epub_screen.dart  Multi-chapter web-to-EPUB workflow
     type_speak_screen.dart   Typed or pasted text reader
     terms_screen.dart        Pronunciation rule editor
     settings_sheet.dart      Appearance settings
@@ -117,6 +133,8 @@ test/
 
 - The automatic release workflow currently produces Android APKs only.
 - Speech quality and available voices depend on the text-to-speech engines installed on the device.
+- Web-to-EPUB chapter discovery relies on link and URL heuristics. Some websites need a site-specific adapter; JavaScript rendering, login requirements, anti-bot protection, pagination, and unusual chapter URL patterns can prevent discovery or downloading.
+- Web chapter cleanup uses HTML selectors and text heuristics. Review the resulting EPUB, because site layouts vary and cleanup may remove content that a particular site uses for something else.
 - Sentence splitting uses rules; unusual abbreviations or punctuation may be handled imperfectly.
 - PDF text is reconstructed into paragraphs using heuristics. Multi-column layouts, headers, footnotes, and complex page designs may be read out of order.
 - The Android application ID is `com.example.tts_reader`, and the iOS bundle identifier is `com.example.ttsReader`. The app's displayed name is **Tts**.
